@@ -3,7 +3,7 @@
 
 `scratch/` is a personal sandbox for portfolio and learning work toward an Agent Engineer role. It is not a single application; it is several adjacent things in one tree.
 
-- `plans/` design docs and progression plans (HTML, produced by the `atelier-plans` skill).
+- `docs/plans/` design docs and progression plans; the canonical form is markdown, with the atelier-plans authoring HTML kept under `docs/plans/html/`.
 - `dist/atelier-plans/` the packaged `atelier-plans` skill itself. Treat as a published artifact, not active source.
 - `analogs/` reference repos cloned for study (`obsidian-wiki`, `obsidian-llm-wiki-local`, `obsidian-skills`). Read-only by default. Do not modify unless explicitly asked.
 - `.claude/skills/` locally installed skills for this project.

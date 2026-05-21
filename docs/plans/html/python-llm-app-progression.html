@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Understanding how Python LLM apps grow into agents | Atelier Plans</title>
-  <meta name="description" content="One repo, ten feature branches: building a persistent personal LLM assistant. Conversation is the substrate, the Obsidian vault is the memory store, tools are added when the assistant earns them. pydantic-ai for the model layer, hand-rolled application layer, FastAPI throughout.">
+  <meta name="description" content="One repository, one persistent personal LLM assistant, built in ten phases. pydantic-ai handles the model layer; the application layer (memory, skills, evals, planning, self-improvement) is hand-rolled. FastAPI throughout.">
 
   <style id="plan-css-inline">
 /* ============================================================
@@ -1320,12 +1320,12 @@ body.edit-off [data-edit-only] { display: none !important; }
         <span class="status" data-status="draft" data-editable></span>
       </div>
       <h1 class="doc-title"><em>Understanding</em> how Python LLM apps grow into agents</h1>
-      <p class="doc-summary">One repository, one persistent personal LLM assistant, built across an init commit and ten feature branches that land on <code>main</code>. Conversation is the substrate. The Obsidian vault is the memory store. Tools are added when the assistant earns them. pydantic-ai handles the model layer; the application layer (memory, skills, evals, planning, self-improvement) is hand-rolled.</p>
+      <p class="doc-summary">One repository, one persistent personal LLM assistant, built in ten phases. pydantic-ai handles the model layer; the application layer (memory, skills, evals, planning, self-improvement) is hand-rolled.</p>
       <dl class="doc-meta">
         <div><dt>Author</dt>      <dd>Scott Clark</dd></div>
         <div><dt>Status</dt>      <dd>draft · in planning</dd></div>
         <div><dt>Started</dt>     <dd>2026-05-21</dd></div>
-        <div><dt>Target</dt>      <dd>rolling · one level at a time</dd></div>
+        <div><dt>Target</dt>      <dd>rolling · one phase at a time</dd></div>
         <div><dt>Tags</dt>        <dd class="tags"><span class="tag">portfolio</span><span class="tag">python</span><span class="tag">pydantic-ai</span><span class="tag">assistant</span><span class="tag">agents</span><span class="tag">memory</span><span class="tag">skills</span><span class="tag">one-repo</span></dd></div>
       </dl>
     </header>
@@ -1335,7 +1335,7 @@ body.edit-off [data-edit-only] { display: none !important; }
 
       <div class="callout" data-kind="goal">
         <span class="callout-label">Goal</span>
-        <div class="callout-body"><p>Build one public repository (<code>assistant/</code>) that grows from a daily-use chat assistant into a self-improving one across an init commit and ten merged feature branches. Each branch teaches one new concept, the assistant is useful to a human (starting with the author) after every merge, and refactoring earlier code as the architecture matures is expected. The throughline is one persistent product, not ten frozen artifacts.</p></div>
+        <div class="callout-body"><p>Build one public repository (<code>assistant/</code>) that grows from a daily-use chat assistant into a self-improving one across an init commit and ten merged feature branches. Each phase teaches one new concept, the assistant is useful to a human (starting with the author) after every merge, and refactoring earlier code as the architecture matures is expected. The throughline is one persistent product, not ten frozen artifacts.</p></div>
       </div>
 
       <div class="callout" data-kind="non-goal">
@@ -1356,44 +1356,41 @@ body.edit-off [data-edit-only] { display: none !important; }
     <section>
       <h2 id="goals">Goals</h2>
       <ol class="id-list" data-kind="goal">
-        <li id="G1"><span class="id-tag">G1</span><div class="id-body">Each level introduces exactly one new technical concept, feature, or agent paradigm the author can articulate and defend in an interview.</div></li>
-        <li id="G2"><span class="id-tag">G2</span><div class="id-body">Each level produces a working app a human would actually use: not a notebook, not a demo.</div></li>
-        <li id="G3"><span class="id-tag">G3</span><div class="id-body">One repo (<code>assistant/</code>), one <code>main</code> branch. Each capability ships as a feature branch that lands on <code>main</code> with tests, eval suite, CHANGELOG entry, and a NOTES.md section explaining the one concept the branch teaches. The repo&rsquo;s git history is the portfolio artifact. See <a href="#decisions">ADR-008</a>.</div></li>
-        <li id="G4"><span class="id-tag">G4</span><div class="id-body">Every level uses the same OpenAI + FastAPI + Python stack and a hand-rolled agent harness.</div></li>
-        <li id="G5"><span class="id-tag">G5</span><div class="id-body">Every level contributes to one growing personal assistant. The Obsidian vault is the memory substrate; tools are added when they earn their place; no level is a standalone data pipeline.</div></li>
-        <li id="G6"><span class="id-tag">G6</span><div class="id-body">Each level is annotate-able, supports failure analysis, and is evaluable without a domain expert (the workflow Hamel Husain documents at <a href="https://hamel.dev">hamel.dev</a>): tasks have verifiable ground truth, judged-by-rubric outputs, or trajectory evals.</div></li>
+        <li id="G1"><span class="id-tag">G1</span><div class="id-body">Each phase introduces exactly one new technical concept, feature, or agent paradigm the author can articulate and defend in an &ldquo;Agent Engineer&rdquo; job interview.</div></li>
+        <li id="G2"><span class="id-tag">G2</span><div class="id-body">Each phase produces a working app a human would actually use: not a notebook, not a demo.</div></li>
+        <li id="G3"><span class="id-tag">G3</span><div class="id-body">One repo (<code>assistant/</code>), one <code>main</code> branch. Each capability ships as a feature branch that lands on <code>main</code> with tests, eval suite, CHANGELOG entry, and a NOTES.md section explaining the one concept the phase teaches. The repo&rsquo;s git history is the portfolio artifact. See <a href="#decisions">ADR-005</a>.</div></li>
+        <li id="G4"><span class="id-tag">G4</span><div class="id-body">Every phase uses the same stack: pydantic-ai and FastAPI with a hand-rolled application layer.</div></li>
+        <li id="G5"><span class="id-tag">G5</span><div class="id-body">Every phase contributes to one growing personal assistant. The Obsidian vault is the memory substrate; tools are added when they earn their place; no phase is a standalone data pipeline.</div></li>
+        <li id="G6"><span class="id-tag">G6</span><div class="id-body">Each phase produces output that&rsquo;s annotatable, supports failure analysis, and can be evaluated without case-by-case expert judgment (following Hamel Husain&rsquo;s workflow at <a href="https://hamel.dev">hamel.dev</a>): tasks have verifiable ground truth, rubric-based scoring, or trajectory evals.</div></li>
       </ol>
     </section>
 
     <section>
       <h2>Non-goals</h2>
       <ol class="id-list" data-kind="non-goal">
-        <li id="NG1"><span class="id-tag">NG1</span><div class="id-body">Multi-model / multi-provider <em>production</em> support. OpenAI is the only build-phase provider. We do keep a thin provider-abstraction seam (see ADR-006) so future expansion is cheap, but we do not implement a second provider in this curriculum. <code>litellm</code> may enter at branch 5 if eval comparisons need cross-provider judges.</div></li>
-        <li id="NG2"><span class="id-tag">NG2</span><div class="id-body">Framework cargo-culting: LangChain, CrewAI, LlamaIndex, OpenAI Agents SDK. We learn from them, we don&rsquo;t use them. <em>(Pydantic-AI and Letta are not in this list; see <a href="#I7">I7</a> for why we reserve the right to revert.)</em></div></li>
-        <li id="NG3"><span class="id-tag">NG3</span><div class="id-body">A unified frontend across all levels. CLI / TUI / web is per-level; the Obsidian plugin is the north star, not a deliverable per level.</div></li>
-        <li id="NG4"><span class="id-tag">NG4</span><div class="id-body">Multi-tenant SaaS shape. One repo, one main branch, one deployment. Multi-principal (<a class="xref" href="#I10">I10</a>) lets the assistant serve a human and an agent client; that is not the same as serving thousands of tenants with isolation, billing, and per-tenant config. <em>Inverted from prior version</em>: continuous refactoring of earlier branches as the architecture matures is now expected, not forbidden, per <a href="#decisions">ADR-008</a>.</div></li>
+        <li id="NG1"><span class="id-tag">NG1</span><div class="id-body">Framework cargo-culting outside the pydantic-ai adoption. No LangChain, CrewAI, LlamaIndex, OpenAI Agents SDK, or Claude Agent SDK in this curriculum. <em>(Pydantic-ai is the chosen model abstraction per <a href="#decisions">ADR-001</a>. See <a href="#I7">I7</a>.)</em></div></li>
+        <li id="NG2"><span class="id-tag">NG2</span><div class="id-body">A unified frontend across all phases. CLI / TUI / web is per-phase; the Obsidian plugin is the north star, not a deliverable per phase.</div></li>
+        <li id="NG3"><span class="id-tag">NG3</span><div class="id-body">Multi-tenant SaaS shape. One repo, one main branch, one deployment, one user on one machine. Serving many tenants with isolation, billing, and per-tenant config is out of scope.</div></li>
       </ol>
     </section>
 
     <section>
       <h2 id="invariants">Invariants</h2>
       <ol class="id-list" data-kind="invariant">
-        <li id="I1"><span class="id-tag">I1</span><div class="id-body">Every level the assistant reaches has an LLM loop with more than one call. Even branch 1 retries on validation failure (pydantic-ai handles the retry mechanics under the hood per ADR-006).</div></li>
-        <li id="I2"><span class="id-tag">I2</span><div class="id-body">Every project has some form of memory. The kind varies (in-context, always-loaded AGENTS.md-style, semantic, agent-owned, episodic, procedural) and is the central learning artifact of that level.</div></li>
-        <li id="I3"><span class="id-tag">I3</span><div class="id-body">Every project has a FastAPI backend. The frontend is whatever fits (CLI, TUI, or web). The API stays consistent so any future surface (Obsidian plugin, mobile app, hosted web UI) plugs into the same backend.</div></li>
-        <li id="I4"><span class="id-tag">I4</span><div class="id-body">Every project ships with an eval suite proportional to its complexity. L1 needs &lsquo;X&rsquo; labeled examples; L10 needs a closed-loop self-evaluator.</div></li>
-        <li id="I5"><span class="id-tag">I5</span><div class="id-body"><strong>Trace.</strong> All LLM calls, tool invocations, and costs are logged to a local SQLite or JSONL store. This is the source for annotations, failure analysis, and evals. Non-negotiable from L1.</div></li>
+        <li id="I1"><span class="id-tag">I1</span><div class="id-body">Every phase the assistant reaches has an LLM loop with more than one call. Even phase 1 retries on validation failure (pydantic-ai handles the retry mechanics under the hood per ADR-001).</div></li>
+        <li id="I2"><span class="id-tag">I2</span><div class="id-body">Every phase has some form of memory. The kind varies (in-context, always-loaded AGENTS.md-style, semantic, agent-owned, episodic, procedural) and is the central learning artifact of that phase.</div></li>
+        <li id="I3"><span class="id-tag">I3</span><div class="id-body">Every phase has a FastAPI backend. The frontend is whatever fits (CLI, TUI, or web). The API stays consistent so any future surface (Obsidian plugin, mobile app, hosted web UI) plugs into the same backend.</div></li>
+        <li id="I4"><span class="id-tag">I4</span><div class="id-body">Every phase ships with an eval suite proportional to its complexity: roughly 10&ndash;20 labeled fixtures per verifiable behavior at phase 1, scaling to a closed-loop self-evaluator by phase 10.</div></li>
+        <li id="I5"><span class="id-tag">I5</span><div class="id-body"><strong>Trace.</strong> All LLM calls, tool invocations, token counts, costs, and latencies are captured by pydantic-ai&rsquo;s native instrumentation (Pydantic Logfire, OpenTelemetry-based: <code>logfire.instrument_pydantic_ai()</code>). This is the source for annotations, failure analysis, and evals. Logfire cloud to start; because the data is standard OpenTelemetry, moving to a local collector later is a config change. Non-negotiable from phase 1.</div></li>
         <li id="I6"><span class="id-tag">I6</span><div class="id-body">Every markdown file our agents write to the vault that contains agent-readable instructions is <a class="xref" href="#patterns">Skills-spec compliant</a>. <em>(Open question: verify the Skills-spec frontmatter is also Obsidian-compatible so the same file renders cleanly in the vault.)</em></div></li>
-        <li id="I7"><span class="id-tag">I7</span><div class="id-body">Goal is no agent framework imports outside <code>openai</code>. Tool schemas, the loop, retries, and memory are written by us, in our repo. <em>(We may revert to Pydantic-AI or Letta at some point, and we are likely to take detours to explore how the frameworks would make our lives easier. The default stance is hand-rolled; the detours are deliberate exceptions, not drift.)</em></div></li>
-        <li id="I8"><span class="id-tag">I8</span><div class="id-body">Writes to external systems (Bluesky posts/replies/likes/follows, future tool integrations) are scoped to bot or sandbox accounts owned by the author. Reads can be global, subject to platform terms and rate limits. Larger public-figure accounts that opt into bot interaction can be allowlisted; default-deny on writes otherwise. Protects against accidental notification spam to non-consenting users and keeps the portfolio defensible.</div></li>
-        <li id="I9"><span class="id-tag">I9</span><div class="id-body">App code never imports a provider SDK directly. Chat, streaming, and structured-output calls route through pydantic-ai&rsquo;s <code>Agent</code> / <code>Model</code> interface (per ADR-006). Embeddings route through the indexer&rsquo;s provider-agnostic interface (e.g., <code>chromadb</code>&rsquo;s embedding functions). Provider swap is a model-string change in config, not a code change.</div></li>
-        <li id="I10"><span class="id-tag">I10</span><div class="id-body">Every API call identifies its calling principal (human user or agent). Conversations, semantic-recall corpora, user-fact memories, and traces are partitioned per principal; skills and shared project knowledge are global. Multi-principal from L1: designed in, not retrofitted. See ADR-007.</div></li>
+        <li id="I7"><span class="id-tag">I7</span><div class="id-body">Pydantic-ai is the only agent framework we import; it owns the model-call layer (per-agent loop, tool dispatch, retries, structured outputs, streaming) per <a href="#decisions">ADR-001</a>. Everything above it is hand-rolled in our repo: memory store, skill catalog, eval harness, skill drafting, planner/worker contract, self-improvement loop. No LangChain, CrewAI, LlamaIndex, OpenAI Agents SDK, or Claude Agent SDK.</div></li>
+        <li id="I8"><span class="id-tag">I8</span><div class="id-body">App code never imports a provider SDK directly. Chat, streaming, and structured-output calls route through pydantic-ai&rsquo;s <code>Agent</code> / <code>Model</code> interface (per ADR-001). Embeddings route through the indexer&rsquo;s provider-agnostic interface (e.g., <code>chromadb</code>&rsquo;s embedding functions). Provider swap is a model-string change in config, not a code change.</div></li>
       </ol>
     </section>
 
     <section>
       <h2 id="context">Context</h2>
-      <p class="lede">The 2026 agent landscape is crowded with frameworks but thin on production references. The production references that do exist mostly wrote their own harness.</p>
+      <p class="lede">The 2026 agent landscape is crowded with frameworks but thin on production references. This plan adopts one framework, pydantic-ai, for the model-call layer and hand-rolls the application layer above it.</p>
 
       <p>The most-studied agent frameworks in Python (LangChain/LangGraph, CrewAI, AutoGen/AG2, smolagents, Agno, DSPy, Strands, Atomic Agents, Haystack, Letta, Pydantic-AI, OpenAI Agents SDK, Claude Agent SDK) share one structural property: their public production rosters thin out fast under verification. LangChain/LangGraph has the deepest (Klarna, Replit, LinkedIn, Elastic). Pydantic-AI has a handful (MindsDB, Sophos, Boosted.ai) but mostly from the vendor&rsquo;s own case-study page. Letta has Bilt and a few others. The two new agent SDKs (OpenAI Agents, Claude Agent) have <em>no</em> verified third-party shipped products yet. Both are under fourteen months old as public libraries.</p>
 
@@ -1401,16 +1398,17 @@ body.edit-off [data-edit-only] { display: none !important; }
 
       <div class="callout" data-kind="rationale">
         <span class="callout-label">Why this matters for the portfolio</span>
-        <div class="callout-body"><p>If the most credible shipped products avoid frameworks, the hand-rolled approach is itself the marketable skill. The portfolio&rsquo;s narrative is not &ldquo;I can use Pydantic-AI&rdquo;: it&rsquo;s &ldquo;I built a small Claude Code on my own laptop and I understand every line.&rdquo;</p></div>
+        <div class="callout-body"><p>The marketable skill is judgment about the boundary: delegate the model-call plumbing to pydantic-ai, hand-roll the application layer (memory, skills, evals, planning). The portfolio narrative is &ldquo;I delegated the boring infrastructure and built the interesting parts.&rdquo;</p></div>
       </div>
 
       <div class="callout" data-kind="assumption">
         <span class="callout-label">Assumptions</span>
         <div class="callout-body">
           <ul>
-            <li>OpenAI&rsquo;s pricing on small and medium models stays cheap enough that an author can run hundreds of eval runs per level without budget pressure.</li>
+            <li>OpenAI/OpenRouter pricing on small and medium models stays cheap enough that an author can run hundreds of eval runs per phase without budget pressure.</li>
             <li>Markdown with YAML frontmatter and wikilink-style cross-references remains a viable substrate for agent-readable memory through the portfolio&rsquo;s build window. The vault is just a folder of files; if Obsidian itself shifts, the underlying format is portable.</li>
             <li>The <a href="https://agentskills.io/specification">agentskills.io</a> spec stays the cross-vendor convergence point for agent skill files.</li>
+            <li>Pydantic-ai remains a maintained, type-safe, model-agnostic library through the portfolio&rsquo;s build window. It is now a core dependency (<a href="#decisions">ADR-001</a>).</li>
           </ul>
         </div>
       </div>
@@ -1427,7 +1425,7 @@ flowchart LR
   L2 --> L3[L3 Declarative memory]
   L3 --> L4[L4 Skills]
   L4 --> L5{{L5 Eval harness}}
-  L5 --> L6[L6 First tool, ReAct]
+  L5 --> L6[L6 First tool, native tool-calling]
   L6 --> L7[L7 Multi-tool agent]
   L7 --> L8[L8 Agent-written skills]
   L8 --> L9[L9 Planner + worker]
@@ -1437,16 +1435,16 @@ flowchart LR
   L5 -.evaluates.-> L3
   L5 -.evaluates.-> L4
         </pre>
-        <figcaption class="figure-caption">Figure 1. One repo, ten branches landing in order on <code>main</code>. Branches 1–4 build the personal-assistant substrate (chat, recall, memory, skills). Branch 5 is the eval pivot, retroactively grading branches 1–4 and supplying the trace store every later branch depends on. Branches 6–10 are tools and agents grown on top of that substrate. Refactoring earlier code is allowed and expected at any branch.</figcaption>
+        <figcaption class="figure-caption">Figure 1. Ten phases, each landing on <code>main</code> as a feature branch. Phases 1–4 build the personal-assistant substrate (chat, recall, memory, skills). Phase 5 is the eval pivot: it extends eval coverage back over phases 1–4 and stands up the eval harness every later phase builds on. Phases 6–10 are tools and agents grown on top of that substrate. Refactoring earlier code is allowed and expected at any phase.</figcaption>
       </figure>
     </section>
 
     <section>
-      <h2>Phases</h2>
+      <h2>Macro-phases</h2>
       <div class="phases" style="--cols: 3;">
         <div class="phase" data-state="active">
           <div class="phase-label">Macro-phase 1</div>
-          <h4 class="phase-title">Assistant substrate (branches 1&ndash;4)</h4>
+          <h4 class="phase-title">Assistant substrate (phases 1&ndash;4)</h4>
           <ul>
             <li>Chat, semantic recall, declarative memory, procedural skills</li>
             <li>Conversation-first; vault as the memory store</li>
@@ -1455,16 +1453,16 @@ flowchart LR
         </div>
         <div class="phase" data-state="future">
           <div class="phase-label">Macro-phase 2</div>
-          <h4 class="phase-title">Eval pivot (branch 5)</h4>
+          <h4 class="phase-title">Eval pivot (phase 5)</h4>
           <ul>
-            <li>Small hand-built eval harness on top of the trace store</li>
-            <li>Retroactively grades branches 1&ndash;4</li>
-            <li>Substrate every later branch reads</li>
+            <li>Small hand-built eval harness on top of the traces</li>
+            <li>Extends eval coverage back over phases 1&ndash;4</li>
+            <li>Substrate every later phase reads</li>
           </ul>
         </div>
         <div class="phase" data-state="future">
           <div class="phase-label">Macro-phase 3</div>
-          <h4 class="phase-title">Tools and agents (branches 6&ndash;10)</h4>
+          <h4 class="phase-title">Tools and agents (phases 6&ndash;10)</h4>
           <ul>
             <li>Pydantic-ai owns the loop; tool design and tracing is the focus</li>
             <li>Tools added when the assistant earns them</li>
@@ -1476,79 +1474,79 @@ flowchart LR
 
     <section>
       <h2 id="levels">Development cycle</h2>
-      <p>One repo (<code>assistant/</code>), one main branch, one persistent product. The portfolio artifact is the repo&rsquo;s history: an init commit that scaffolds the assistant, then ten feature branches each adding one capability and merging to main with tests, evals, and a CHANGELOG entry. Anchor IDs (<code>#l1</code>&hellip;<code>#l10</code>) below match the branch numbers so xrefs from invariants and ADRs still resolve.</p>
+      <p>One repo (<code>assistant/</code>), one main branch, one persistent product. The portfolio artifact is the repo&rsquo;s history: an init commit that scaffolds the assistant, then ten phases, each delivered as a feature branch that adds one capability and merges to main with tests, evals, and a CHANGELOG entry. Anchor IDs (<code>#l1</code>&hellip;<code>#l10</code>) below match the phase numbers so xrefs from invariants and ADRs still resolve.</p>
 
       <h3 id="init">Init &middot; <code>assistant/</code> scaffolding</h3>
-      <p><strong>What lands on main.</strong> Pydantic-ai <code>Agent</code> with zero tools registered. FastAPI app with one Server-Sent Events chat endpoint. SQLite session store indexed by <code>(session_id, principal)</code>. structlog with the trace schema baked in (LLM-call, tool-call, cost, latency, principal, session columns). Provider model-string config (<code>MODEL=openai:gpt-4o-mini</code> by default). Principal plumbing: OS-user resolver for CLI, <code>X-Principal-Id</code> header resolver for HTTP, flowing into session and trace rows. Vault paths created (<code>memory/</code>, <code>skills/</code>, <code>evals/</code>, <code>transcripts/</code>) but unused. ruff + mypy + CI. One smoke test (chat round-trip). One eval fixture format.</p>
-      <p><strong>Decisions baked in at init.</strong> ADR-001 (OpenAI default), ADR-002 (hand-roll the application layer; pydantic-ai for the loop), ADR-003 (FastAPI), ADR-004 (one growing assistant), ADR-006 (pydantic-ai is the provider abstraction), ADR-007 (multi-principal), ADR-008 (one repo, dev cycle).</p>
-      <p><strong>DOD.</strong> Provider abstraction enforced (<a class="xref" href="#I9">I9</a>), principal in every call (<a class="xref" href="#I10">I10</a>), traces logging (<a class="xref" href="#I5">I5</a>), eval fixture loadable, smoke test green.</p>
+      <p><strong>What lands on main.</strong> Pydantic-ai <code>Agent</code> with zero tools registered. FastAPI app with one Server-Sent Events chat endpoint. Conversation is in-memory only: chat works within a running process; durable persistence arrives in phase 1. Tracing via pydantic-ai&rsquo;s Logfire instrumentation, enabled at init; structlog configured for application logging. Provider model-string config (<code>MODEL=openai:gpt-4o-mini</code> by default). Vault paths created (<code>memory/</code>, <code>skills/</code>, <code>evals/</code>, <code>transcripts/</code>) but unused. ruff + mypy + CI. One smoke test (chat round-trip). One eval fixture format.</p>
+      <p><strong>Decisions baked in at init.</strong> ADR-001 (pydantic-ai for the model layer, hand-rolled application layer), ADR-002 (FastAPI), ADR-003 (one growing assistant), ADR-005 (one repo, dev cycle).</p>
+      <p><strong>DOD.</strong> Provider abstraction enforced (<a class="xref" href="#I8">I8</a>), traces logging (<a class="xref" href="#I5">I5</a>), eval fixture loadable, smoke test green.</p>
 
-      <h3 id="l1">Branch 1 &middot; <code>feat/transcripts</code></h3>
-      <p><strong>Adds.</strong> Session-end vault-write: every completed (or cancelled) turn renders to <code>vault/transcripts/{principal}/{date}/{session}.md</code>. Introduces the <a class="xref" href="#vault-primitives">vault-write primitives</a> (manifest + staging + provenance markers) for the first time; every later branch that writes to the vault reuses them.</p>
-      <p><strong>Tests.</strong> Persistence round-trip (turn → markdown → re-parseable). Cancellation marker (<code>[cancelled]</code>) on disconnect. Principal-folder routing.</p>
+      <h3 id="l1">Phase 1 &middot; <code>feat/transcripts</code></h3>
+      <p><strong>Adds.</strong> The first persistence layer. Every completed (or cancelled) turn renders at session end to <code>vault/transcripts/{date}/{session}.md</code>. Introduces the <a class="xref" href="#vault-primitives">vault-write primitives</a> (manifest + staging + provenance markers) for the first time; every later phase that writes to the vault reuses them.</p>
+      <p><strong>Tests.</strong> Persistence round-trip (turn → markdown → re-parseable). Cancellation marker (<code>[cancelled]</code>) on disconnect.</p>
       <p><strong>Primary analog.</strong> <a href="https://github.com/Azure-Samples/rag-postgres-openai-python">Azure-Samples/rag-postgres-openai-python</a> for FastAPI + streaming + persistence; <a href="https://github.com/basicmachines-co/basic-memory">basicmachines-co/basic-memory</a> for the chat-plus-notes persistence shape; <a href="https://github.com/simonw/llm">simonw/llm</a> for the CLI shape.</p>
       <p><strong>Merge.</strong> Main has browsable transcripts.</p>
 
-      <h3 id="l2">Branch 2 &middot; <code>feat/semantic-recall</code></h3>
-      <p><strong>Adds.</strong> Embedding index (<code>chromadb</code> or <code>sqlite-vec</code>) over completed turns plus a BM25 lexical index alongside. Pre-turn retrieval injects top-k (3&ndash;5) relevant past exchanges into the system prompt for that turn only. Chunking is per turn at first cut (one user message + assistant response = one chunk); per-topic clustering deferred. Index lives alongside the SQLite session store, not in the vault. Retrieval scope is per-principal per <a class="xref" href="#I10">I10</a>. Embeddings route through the indexer&rsquo;s own provider-agnostic interface (chromadb embedding functions), not through pydantic-ai.</p>
+      <h3 id="l2">Phase 2 &middot; <code>feat/semantic-recall</code></h3>
+      <p><strong>Adds.</strong> Embedding index (<code>chromadb</code> or <code>sqlite-vec</code>) over completed turns plus a BM25 lexical index alongside. Pre-turn retrieval injects top-k (3&ndash;5) relevant past exchanges into the system prompt for that turn only. Chunking is per turn at first cut (one user message + assistant response = one chunk); per-topic clustering deferred. Index persisted alongside session data, outside the vault. Embeddings route through the indexer&rsquo;s own provider-agnostic interface (chromadb embedding functions), not through pydantic-ai.</p>
       <p><strong>Tests.</strong> Recall@k and MRR on bootstrapped (query → expected past-exchange) pairs sampled from your own history. Faithfulness when retrieved context is summarized into the response.</p>
       <p><strong>Primary analog.</strong> <a href="https://github.com/benmaster82/Kwipu">benmaster82/Kwipu</a> for the hybrid-retrieval shape. <a href="https://github.com/basicmachines-co/basic-memory">basic-memory</a> for the conversation-as-corpus shape.</p>
       <p><strong>Merge.</strong> Main remembers what you talked about.</p>
 
-      <h3 id="l3">Branch 3 &middot; <code>feat/declarative-memory</code></h3>
-      <p><strong>Adds.</strong> Per-principal markdown files in <code>vault/memory/{principal}/</code> always-loaded as part of the Agent&rsquo;s system prompt under a token budget (default ~1000 tokens; older facts age out into a searchable not-always-loaded tier). Shared project knowledge in <code>vault/memory/global/</code> loaded regardless of principal. Background fact extraction via <code>direct.model_request</code> after each turn (non-blocking; the next turn sees updates). Contradiction detection at write time via embedding similarity, resolved by superseding with citation to the contradicting exchange.</p>
+      <h3 id="l3">Phase 3 &middot; <code>feat/declarative-memory</code></h3>
+      <p><strong>Adds.</strong> Markdown files in <code>vault/memory/</code> always-loaded as part of the Agent&rsquo;s system prompt under a token budget (default ~1000 tokens; older facts age out into a searchable not-always-loaded tier). Background fact extraction via <code>direct.model_request</code> after each turn (non-blocking; the next turn sees updates). Contradiction detection at write time via embedding similarity, resolved by superseding with citation to the contradicting exchange.</p>
       <p><strong>Tests.</strong> Planted-fact recall across sessions. Contradiction resolution with citation. Token budget enforced.</p>
       <p><strong>Primary analog.</strong> <a href="https://github.com/cline/cline">cline/cline</a> Memory Bank pattern (<code>.clinerules/</code> as always-loaded procedural memory). Anthropic&rsquo;s own <code>AGENTS.md</code> / <code>CLAUDE.md</code> convention as the canonical shape. <a href="https://github.com/Ar9av/obsidian-wiki">Ar9av/obsidian-wiki</a> for vault conventions (manifest, <code>hot.md</code>, staging, provenance markers).</p>
       <p><strong>Merge.</strong> Main knows you between sessions.</p>
 
-      <h3 id="l4">Branch 4 &middot; <code>feat/skills</code></h3>
-      <p><strong>Adds.</strong> <code>SKILL.md</code> files in <code>vault/skills/</code> with agentskills.io frontmatter (<code>name</code>, <code>description</code>, <code>triggers</code>, <code>source:</code>). Two-stage match-on-input: keyword/regex on <code>triggers</code> first (fast and cheap), then embedding similarity on <code>description</code> (catches rephrasings). Matched skills inject into the Agent&rsquo;s system prompt in priority order, capped by a token budget. Watchdog-watched directory; new skills picked up without restart. <a class="xref" href="#patterns">Progressive disclosure</a>: skill bodies plus optional <code>references/</code> and <code>scripts/</code> loaded only when the workflow points to them. User-edited and (later) agent-written skills coexist; <code>source:</code> frontmatter distinguishes them.</p>
+      <h3 id="l4">Phase 4 &middot; <code>feat/skills</code></h3>
+      <p><strong>Adds.</strong> <code>SKILL.md</code> files in <code>vault/skills/</code> with agentskills.io frontmatter (<code>name</code>, <code>description</code>); provenance rides in the spec&rsquo;s client-key escape hatch as <code>metadata.source</code> (user-written vs agent-written). Match-on-input is description-driven, as the spec intends: embedding similarity between the user&rsquo;s turn and each skill&rsquo;s <code>description</code>, which catches rephrasings a keyword list would miss. Matched skills inject into the Agent&rsquo;s system prompt in priority order, capped by a token budget. Watchdog-watched directory; new skills picked up without restart. <a class="xref" href="#patterns">Progressive disclosure</a>: skill bodies plus optional <code>references/</code> and <code>scripts/</code> loaded only when the workflow points to them. User-edited and (later) agent-written skills coexist; <code>metadata.source</code> distinguishes them.</p>
       <p><strong>Tests.</strong> Skill-match precision (did the right skill load for the query?). Skill-following adherence (did the response follow the skill&rsquo;s steps?).</p>
       <p><strong>Primary analog.</strong> <a href="https://github.com/kepano/obsidian-skills">kepano/obsidian-skills</a>: format target. Anthropic Agent Skills as the canonical schema. <a href="https://github.com/cline/cline">cline/cline</a> Memory Bank for the procedural-memory shape.</p>
       <p><strong>Merge.</strong> Main has opinions about recurring tasks.</p>
 
-      <h3 id="l5">Branch 5 &middot; <code>feat/eval-harness</code> &middot; <em>the pivot</em></h3>
-      <p><strong>Adds.</strong> CLI plus library that loads per-intent fixture datasets (in <code>vault/evals/{branch}/</code> as markdown with frontmatter), runs the target branch&rsquo;s Agent against each, scores via <code>direct.model_request</code> judge calls, writes to the SQLite trace store with rollups per fixture, bucket, skill, principal. Comparison view in <code>rich</code>: prompt-version A vs B, model X vs Y, skill-version v1 vs v2. Diskcache-backed judge cache prevents cost explosions across re-runs. Backfills grading over the trace store so branches 1&ndash;4 retroactively score. Per-branch Agents invoked via direct Python import (each capability stays importable as a package).</p>
-      <p><strong>Tests.</strong> This branch <em>is</em> the eval. Validation: judge correlation with held-out human spot checks on a 10-example slice.</p>
-      <p><strong>Primary analog.</strong> <a href="https://github.com/meshkovQA/Eval-ai-library">meshkovQA/Eval-ai-library</a> for size and shape. Read <a href="https://github.com/openai/evals">openai/evals</a> for the YAML + grader pattern but don&rsquo;t template (too big). <a href="https://github.com/explodinggradients/ragas">ragas</a> for chat-specific metrics applied to branches 1&ndash;2.</p>
+      <h3 id="l5">Phase 5 &middot; <code>feat/eval-harness</code> &middot; <em>the pivot</em></h3>
+      <p><strong>Adds.</strong> CLI plus library that loads per-intent fixture datasets (in <code>vault/evals/{phase}/</code> as markdown with frontmatter), runs each capability against its fixtures on current <code>main</code>, scores via <code>direct.model_request</code> judge calls, and writes eval results with rollups per fixture, bucket, and skill. Comparison view in <code>rich</code>: prompt-version A vs B, model X vs Y, skill-version v1 vs v2. Diskcache-backed judge cache prevents cost explosions across re-runs. Phases 1&ndash;4 are scored by adding their fixture buckets and running them against current <code>main</code>: &ldquo;retroactive&rdquo; means extending eval coverage back over earlier capabilities, not reproducing historical behavior. Each capability stays importable as a package so the harness can invoke it directly.</p>
+      <p><strong>Tests.</strong> This phase <em>is</em> the eval. Validation: judge-human agreement on a held-out slice of 30&ndash;50 spot-checked examples per judge (smaller slices give error bars too wide to trust).</p>
+      <p><strong>Primary analog.</strong> <a href="https://github.com/meshkovQA/Eval-ai-library">meshkovQA/Eval-ai-library</a> for size and shape. Read <a href="https://github.com/openai/evals">openai/evals</a> for the YAML + grader pattern but don&rsquo;t template (too big). <a href="https://github.com/explodinggradients/ragas">ragas</a> for chat-specific metrics applied to phases 1&ndash;2.</p>
       <p><strong>Merge.</strong> Main can be tuned against itself.</p>
 
-      <h3 id="l6">Branch 6 &middot; <code>feat/first-tool</code></h3>
-      <p><strong>Adds.</strong> First <code>@agent.tool</code> registered with the pydantic-ai Agent. Function is <code>fetch_url(url: str) -&gt; str</code> (or <code>web_search(q) -&gt; list[Result]</code>); choice driven by what branches 1&ndash;5 trace data shows you most often want to outsource. Pydantic-ai auto-generates the JSON schema from the typed signature. Tools receive a <code>RunContext</code> carrying the principal so they can refuse out-of-scope calls. Tool errors surface to the Agent as result content; the Agent decides retry, clarify, or give up. Every invocation traced (args, return, latency, cost). The interesting work is tool design and tracing, not the loop (pydantic-ai handles that).</p>
+      <h3 id="l6">Phase 6 &middot; <code>feat/first-tool</code></h3>
+      <p><strong>Adds.</strong> First <code>@agent.tool</code> registered with the pydantic-ai Agent. Function is <code>fetch_url(url: str) -&gt; str</code> (or <code>web_search(q) -&gt; list[Result]</code>); choice driven by what phases 1&ndash;5 trace data shows you most often want to outsource. Pydantic-ai auto-generates the JSON schema from the typed signature. Tools receive a pydantic-ai <code>RunContext</code> carrying shared dependencies (config, clients). Tool errors surface to the Agent as result content; the Agent decides retry, clarify, or give up. Every invocation traced (args, return, latency, cost). The interesting work is tool design and tracing, not the loop (pydantic-ai handles that).</p>
       <p><strong>Tests.</strong> Trajectory grading (right tool, right args, right number of iterations). Task success on a small fetch-or-search dataset.</p>
       <p><strong>Primary analog.</strong> <a href="https://github.com/simonw/llm">simonw/llm</a>&rsquo;s <code>_tools.py</code> as the battle-tested reference. <a href="https://github.com/gptme/gptme">gptme/gptme</a> for the loop shape (kept as a comparison artifact even though pydantic-ai now owns the loop).</p>
       <p><strong>Merge.</strong> Main can reach outside the conversation.</p>
 
-      <h3 id="l7">Branch 7 &middot; <code>feat/multi-tool-routing</code></h3>
-      <p><strong>Adds.</strong> Several tools registered (<code>fetch_url</code>, <code>web_search</code>, <code>vault_search</code>, <code>current_time</code>, plus one or two others chosen from what branches 1&ndash;6 traces show you actually wanted to outsource). System prompt explicitly tells the Agent to consult memory (<a class="xref" href="#l3">branch 3</a>) and skills (<a class="xref" href="#l4">branch 4</a>) <em>before</em> calling tools. Memory and skills also exposed as tools the Agent can invoke on demand. Per-turn budget (max N tool calls, max wall-clock seconds) caps runaway loops. Parallel tool calls handled by pydantic-ai. Tool cost tracked alongside model cost in the trace store.</p>
+      <h3 id="l7">Phase 7 &middot; <code>feat/multi-tool-routing</code></h3>
+      <p><strong>Adds.</strong> Several tools registered (<code>fetch_url</code>, <code>web_search</code>, <code>vault_search</code>, <code>current_time</code>, and read-only Bluesky tools <code>bsky_search</code> and <code>bsky_get_thread</code> via the <code>atproto</code> client and the <code>getPostThreadV2</code> lexicon, plus one or two others chosen from what phases 1&ndash;6 traces show you actually wanted to outsource). System prompt explicitly tells the Agent to consult memory (<a class="xref" href="#l3">phase 3</a>) and skills (<a class="xref" href="#l4">phase 4</a>) <em>before</em> calling tools. Memory and skills also exposed as tools the Agent can invoke on demand. Per-turn budget (max N tool calls, max wall-clock seconds) caps runaway loops. Parallel tool calls handled by pydantic-ai. Tool cost tracked alongside model cost in the traces.</p>
       <p><strong>Tests.</strong> Trajectory at higher cardinality (did it skip tools it didn&rsquo;t need?). Task success on multi-tool tasks. Token efficiency: did memory and skills suppress unnecessary tool calls?</p>
       <p><strong>Primary analog.</strong> <a href="https://github.com/gptme/gptme">gptme/gptme</a> (multi-tool loop). <a href="https://github.com/NirDiamant/Agent_Memory_Techniques">NirDiamant/Agent_Memory_Techniques</a> for memory-aware tool routing patterns.</p>
       <p><strong>Merge.</strong> Main is a real assistant.</p>
 
-      <h3 id="l8">Branch 8 &middot; <code>feat/skill-drafter</code></h3>
-      <p><strong>Adds.</strong> Scheduled job (<code>assistant skills draft</code>, also cron-runnable) that mines recent traces for repeated request patterns lacking matching skills. Drafts <code>SKILL.md</code> via <code>direct.model_request</code> returning a typed <code>SkillDraft</code> Pydantic model into <code>vault/skills/_staging/</code>. Drafts carry the source trace IDs for human auditing. A review CLI (<code>assistant skills review</code>) promotes drafts into <code>vault/skills/</code>. Promotion is human-gated at this branch; <a class="xref" href="#l10">branch 10</a> is when promotion becomes self-directed.</p>
+      <h3 id="l8">Phase 8 &middot; <code>feat/skill-drafter</code></h3>
+      <p><strong>Adds.</strong> Scheduled job (<code>assistant skills draft</code>, also cron-runnable) that mines recent traces for repeated request patterns lacking matching skills. Pattern discovery is an aggregation step, not a single LLM call: embed the request turns and cluster them (embedding clusters, or frequent-itemset over tool/intent sequences), then surface clusters above a frequency threshold. Only then does a <code>direct.model_request</code> draft a <code>SKILL.md</code> per cluster, returning a typed <code>SkillDraft</code> Pydantic model into <code>vault/skills/_staging/</code>. Drafts carry the source trace IDs for human auditing. A review CLI (<code>assistant skills review</code>) promotes drafts into <code>vault/skills/</code>. Promotion is human-gated at this phase; <a class="xref" href="#l10">phase 10</a> is when promotion becomes self-directed.</p>
       <div class="callout" data-kind="caveat">
         <span class="callout-label">Framing correction</span>
         <div class="callout-body"><p>Ar9av/obsidian-wiki and kepano/obsidian-skills are <em>not</em> Python agent frameworks: they&rsquo;re markdown-only skill collections that run on Claude Code/Cursor/Codex. We borrow their conventions; we don&rsquo;t port them. The drafting Agent is original code on pydantic-ai.</p></div>
       </div>
-      <p><strong>Tests.</strong> Draft quality (do agent-drafted skills pass the branch-4 skill-following metric?). Acceptance rate (drafts approved / drafts proposed).</p>
+      <p><strong>Tests.</strong> Draft quality (do agent-drafted skills pass the phase-4 skill-following metric?). Acceptance rate (drafts approved / drafts proposed).</p>
       <p><strong>Primary analog.</strong> <a href="https://github.com/cline/cline">cline/cline</a> Memory Bank (<code>.clinerules/</code> written by the agent). <a href="https://github.com/breferrari/obsidian-mind">breferrari/obsidian-mind</a> for vault templates. <a href="https://github.com/kepano/obsidian-skills">kepano/obsidian-skills</a> as the format target.</p>
       <p><strong>Merge.</strong> Main proposes improvements to itself.</p>
 
-      <h3 id="l9">Branch 9 &middot; <code>feat/planner-worker</code></h3>
-      <p><strong>Adds.</strong> Two pydantic-ai Agents in a structured contract. Planner is read-only (tool whitelist enforces this) and emits a typed <code>Plan</code> (list of steps, each naming a worker action plus expected outcome). Worker executes one step at a time and returns structured results; planner can re-plan after observing them. Context handoff is a structured message, not a shared log (the key reliability lever). Long-horizon tasks checkpoint to the trace store and resume on crash. Introduces Bluesky as a tool surface via the <code>atproto</code> client and the <code>getPostThreadV2</code> lexicon: read tools (<code>bsky_get_thread</code>, <code>bsky_search</code>, <code>bsky_get_profile</code>) plus bot-scoped write tools (<code>bsky_post</code>, <code>bsky_reply</code>) per <a class="xref" href="#I8">I8</a>. Bot-account selection (apollo / argus / atlas) flows through principal context per task; write tools refuse if the active bot doesn&rsquo;t own the target.</p>
-      <p><strong>Tests.</strong> Task success on held-out long-horizon tasks (planted Bluesky scenarios using bot fixtures; planted vault setups with known orphans). Trajectory: did the planner stay read-only?</p>
+      <h3 id="l9">Phase 9 &middot; <code>feat/planner-worker</code></h3>
+      <p><strong>Adds.</strong> Two pydantic-ai Agents in a structured contract. The planner is read-only (a tool whitelist enforces it) and emits a typed <code>Plan</code>: a list of steps, each naming a worker action plus its expected outcome. The worker executes one step at a time and returns structured results; the planner re-plans after observing them. The read-only/read-write split is the point: the planner holds no write tools, so a bad plan costs nothing until the worker acts on it. The handoff is a typed <code>Plan</code> object, not a shared transcript. Long-horizon tasks checkpoint their progress (mechanism deferred) and resume on crash.</p>
+      <p><strong>Tests.</strong> Task success on held-out long-horizon tasks (planted vault setups with known orphans; planted multi-step research tasks). Trajectory: did the planner stay read-only, and did the worker follow the plan?</p>
       <p><strong>Primary analog.</strong> <a href="https://github.com/sst/opencode">sst/opencode</a> for the cleanest open <code>plan</code>/<code>build</code> split. <a href="https://github.com/SWE-agent/SWE-agent">SWE-agent</a> mini variant (~100 LOC) for the academic-clean planner→tool loop.</p>
       <p><strong>First named use cases.</strong> &ldquo;Build me a Bluesky dossier on @karpathy.&rdquo; Or: &ldquo;Audit my vault for orphan notes and propose links across hundreds of files in one pass.&rdquo;</p>
       <p><strong>Merge.</strong> Main can take all-afternoon tasks.</p>
 
-      <h3 id="l10">Branch 10 &middot; <code>feat/self-improving</code></h3>
-      <p><strong>Adds.</strong> Meta-Agent reads the trace store, clusters skill-following failures via a <code>direct.model_request</code> returning typed cluster descriptors, and runs <a href="https://github.com/stanfordnlp/dspy">DSPy</a>&rsquo;s GEPA optimizer over the affected <code>SKILL.md</code> bodies. Candidate skill versions land in <code>vault/skills/_proposed/</code>. Auto-promotion when a held-out eval slice clears a conservative threshold (e.g., +10% with p&lt;0.05); failures auto-revert. Runs on a configurable schedule (default weekly). The user-gated drafter from <a class="xref" href="#l8">branch 8</a> stays as the discovery counterpart to this branch&rsquo;s auto-gated optimization.</p>
+      <h3 id="l10">Phase 10 &middot; <code>feat/self-improving</code></h3>
+      <p><strong>Adds.</strong> Meta-Agent reads the trace history, clusters skill-following failures via a <code>direct.model_request</code> returning typed cluster descriptors, and runs <a href="https://github.com/stanfordnlp/dspy">DSPy</a>&rsquo;s GEPA optimizer over the affected <code>SKILL.md</code> bodies. Candidate skill versions land in <code>vault/skills/_proposed/</code>. Auto-promotion when a held-out eval slice clears a conservative, pre-registered threshold; failures auto-revert. The slice size and effect threshold are fixed when phase 5&rsquo;s eval suite is built, with the slice large enough that the threshold is statistically meaningful. Runs on a configurable schedule (default weekly). The user-gated drafter from <a class="xref" href="#l8">phase 8</a> stays as the discovery counterpart to this phase&rsquo;s auto-gated optimization.</p>
       <p><strong>Tests.</strong> Meta-eval: does the agent&rsquo;s self-improvement actually improve held-out task performance? Spearman ρ on a held-out set.</p>
-      <p><strong>Primary analog.</strong> <a href="https://github.com/NousResearch/hermes-agent-self-evolution">NousResearch/hermes-agent-self-evolution</a> (architecture match). Engine: <a href="https://github.com/stanfordnlp/dspy">stanfordnlp/dspy</a> GEPA optimizer over the skill markdown files. Fallback: <a href="https://github.com/EvoAgentX/EvoAgentX">EvoAgentX/EvoAgentX</a>.</p>
+      <p><strong>Primary analog.</strong> <a href="https://github.com/NousResearch/hermes-agent">NousResearch/hermes-agent</a>, a shipped assistant with a built-in learning loop, is the closest whole-trajectory analog; its <a href="https://github.com/NousResearch/hermes-agent-self-evolution">hermes-agent-self-evolution</a> component is the direct architecture match for this phase. Engine: <a href="https://github.com/stanfordnlp/dspy">stanfordnlp/dspy</a> GEPA optimizer over the skill markdown files. Fallback: <a href="https://github.com/EvoAgentX/EvoAgentX">EvoAgentX/EvoAgentX</a>.</p>
       <div class="callout" data-kind="caveat">
         <span class="callout-label">Known wrinkle</span>
-        <div class="callout-body"><p>This branch has no clean production analog. Ship as a capstone branch with a thinner code surface than branches 8 or 9. ~50% blog post, 50% code. Hermes itself last committed 2026-03-29: stale relative to the rest of the analog roster.</p></div>
+        <div class="callout-body"><p>This phase has no clean single-developer analog (hermes-agent is a funded team&rsquo;s product). Ship as a capstone phase with a thinner code surface than phases 8 or 9. ~50% blog post, 50% code.</p></div>
       </div>
       <p><strong>Merge.</strong> Main improves on its own.</p>
     </section>
@@ -1559,14 +1557,14 @@ flowchart LR
       <div class="decision" data-state="accepted">
         <div class="decision-head">
           <span class="decision-id">ADR-001</span>
-          <h3 class="decision-title">Use OpenAI only for the build phase</h3>
+          <h3 class="decision-title">Adopt pydantic-ai for the model layer; hand-roll the application layer</h3>
           <span class="status" data-status="approved" data-editable></span>
         </div>
-        <p><strong>Context.</strong> OpenAI, Anthropic, Gemini, and open-weight models all viable.</p>
-        <p><strong>Decision.</strong> OpenAI only for L1–L10. <code>litellm</code> may enter at L5 to enable cross-provider evals: never earlier.</p>
-        <p><strong>Consequences.</strong> Cheaper iteration on small models; fewer provider-quirk distractions; portfolio doesn&rsquo;t demonstrate provider abstraction (acceptable: see <a href="#NG1">NG1</a>).</p>
+        <p><strong>Context.</strong> An agent product splits into a model-call layer (loop, tool dispatch, retries, structured output, streaming) and an application layer (memory, skills, evals, planning, self-improvement). The model-call layer is solved; the application layer is where the defensible engineering is.</p>
+        <p><strong>Decision.</strong> Pydantic-ai owns the model-call layer. App code uses pydantic-ai&rsquo;s <code>Agent</code> / <code>Model</code> types and Pydantic result types; it never imports a provider SDK directly. The provider and model are a config string (e.g. <code>openai:gpt-4o-mini</code>); provider choice is a config/runtime detail, not an architecture decision. The application layer is hand-rolled in this repo: memory store, skill catalog, eval harness, skill drafting, planner/worker contract, self-improvement loop. No LangChain, CrewAI, LlamaIndex, OpenAI Agents SDK, or Claude Agent SDK.</p>
+        <p><strong>Consequences.</strong> The hand-rolled work concentrates where the interesting design lives; no time is spent reimplementing a ReAct loop or tool-call parsing. Type safety throughout (Pydantic-native result types). Provider portability is config. One framework dependency, scoped to exactly this seam. Embeddings route through the indexer&rsquo;s own provider-agnostic interface (e.g. <code>chromadb</code>&rsquo;s embedding functions), not through pydantic-ai.</p>
         <dl class="decision-meta">
-          <dt>Alternatives</dt><dd>Anthropic only; <code>litellm</code> from L1; local model via Ollama</dd>
+          <dt>Alternatives</dt><dd>Adopt a full agent framework end to end (LangGraph, CrewAI, OpenAI Agents SDK) and hand-roll nothing; hand-roll everything including the model-call layer on a raw provider SDK; a thin in-repo <code>app.provider.LLM</code> wrapper (more glue code, no community-tested provider parity)</dd>
           <dt>Owner</dt><dd>Scott</dd>
         </dl>
       </div>
@@ -1574,15 +1572,14 @@ flowchart LR
       <div class="decision" data-state="accepted">
         <div class="decision-head">
           <span class="decision-id">ADR-002</span>
-          <h3 class="decision-title">Hand-roll the agent harness on the raw SDK</h3>
+          <h3 class="decision-title">FastAPI backend on every phase; frontend varies</h3>
           <span class="status" data-status="approved" data-editable></span>
         </div>
-        <p><strong>Context.</strong> The agent-framework landscape is crowded; the most credible shipped products avoid frameworks.</p>
-        <p><strong>Decision.</strong> Hand-roll the <em>application layer</em>: memory store, skill catalog, eval harness, principal partitioning, skill drafting, planner/worker contract, self-improvement loop. No LangChain, CrewAI, LlamaIndex, OpenAI Agents SDK, or Claude Agent SDK.</p>
-        <p><strong>Amendment (2026-05-21).</strong> Pydantic-ai owns the per-call model interaction: the chat loop, tool dispatch, structured outputs, retries, and streaming (see ADR-006). App code talks to pydantic-ai&rsquo;s <code>Agent</code> / <code>Model</code> interface, not the openai SDK directly. The interesting hand-rolled work is the application layer above pydantic-ai (memory, skills, evals, planning, self-improvement); reinventing the loop and tool-call parsing was where time would have been wasted. Letta remains permitted in specific levels where it meaningfully reduces code. See <a href="#I7">I7</a>.</p>
-        <p><strong>Consequences.</strong> The hand-rolled work is at the application layer (memory, skills, evals, planning, self-improvement) where the interesting design lives. The model-interaction layer (loop, tool dispatch, retries, streaming) is delegated to pydantic-ai per the amendment. The resulting skill (&ldquo;a small Claude Code on my laptop, with the boring infrastructure delegated and the interesting parts built by hand&rdquo;) is more credible than a framework integration <em>and</em> more credible than reimplementing a ReAct loop from scratch.</p>
+        <p><strong>Context.</strong> The eventual goal is an Obsidian plugin. Obsidian plugins are TypeScript but consume HTTP services.</p>
+        <p><strong>Decision.</strong> Every phase exposes a FastAPI backend with a stable API contract. The frontend is per-phase (CLI/TUI/web); an Obsidian plugin can be wired on top of any phase.</p>
+        <p><strong>Consequences.</strong> Slight overhead at init; clean integration story; every phase is consumable from the same Obsidian plugin once written.</p>
         <dl class="decision-meta">
-          <dt>Alternatives</dt><dd>LangGraph (most popular); Pydantic-AI (newest credible); OpenAI Agents SDK (vendor-blessed)</dd>
+          <dt>Alternatives</dt><dd>CLI-only (no API); separate plugin per phase</dd>
           <dt>Owner</dt><dd>Scott</dd>
         </dl>
       </div>
@@ -1590,14 +1587,14 @@ flowchart LR
       <div class="decision" data-state="accepted">
         <div class="decision-head">
           <span class="decision-id">ADR-003</span>
-          <h3 class="decision-title">FastAPI backend on every level; frontend varies</h3>
+          <h3 class="decision-title">Anchor every phase in building one growing personal assistant</h3>
           <span class="status" data-status="approved" data-editable></span>
         </div>
-        <p><strong>Context.</strong> The eventual goal is an Obsidian plugin. Obsidian plugins are TypeScript but consume HTTP services.</p>
-        <p><strong>Decision.</strong> Every level exposes a FastAPI backend with a stable API contract. The frontend is per-level (CLI/TUI/web); an Obsidian plugin can be wired on top of any level.</p>
-        <p><strong>Consequences.</strong> Slight overhead at L1; clean integration story; every level is consumable from the same Obsidian plugin once written.</p>
+        <p><strong>Context.</strong> We need a unifying theme across ten phases that absorbs the breadth of the curriculum (chat, memory, skills, evals, tools, agents) without contortion. We considered three framings: general-purpose-each-app, PKM-anchored-vault, and conversation-anchored-assistant. The strongest analogs we studied (gptme, simonw/llm, Cline, Claude Code itself) are personal assistants that grew capabilities over time, not pipelines over corpora.</p>
+        <p><strong>Decision.</strong> Every phase contributes to one growing personal assistant. The assistant talks to the user (phases <a class="xref" href="#l1">1</a>&ndash;<a class="xref" href="#l2">2</a>), learns about the user (phase <a class="xref" href="#l3">3</a>), develops skills for the user&rsquo;s recurring tasks (phase <a class="xref" href="#l4">4</a>), is graded on its work (phase <a class="xref" href="#l5">5</a>), gains tools when the conversation demands them (phases <a class="xref" href="#l6">6</a>&ndash;<a class="xref" href="#l7">7</a>), proposes its own new skills (phase <a class="xref" href="#l8">8</a>), takes on long-horizon work (phase <a class="xref" href="#l9">9</a>), and improves itself over time (phase <a class="xref" href="#l10">10</a>). The Obsidian vault is the memory substrate where everything the assistant knows lives. External surfaces (Bluesky, web, calendars) are <em>tools the assistant earns</em>, not the foundational substrate.</p>
+        <p><strong>Consequences.</strong> Phases feel like one product family (the assistant grew). Each phase is immediately personally useful (phase 1 alone is a chat tool you use daily; phase 4 is a personalized agent before any tool fires). External-integration risk is bounded: if Bluesky or any other tool turns out to be the wrong fit at phase 9, it gets swapped without disturbing phases 1&ndash;8. The Obsidian-plugin SaaS direction stays credible: the assistant is exactly the kind of thing PKM users want as a plugin, but the assistant is the product, not the plugin.</p>
         <dl class="decision-meta">
-          <dt>Alternatives</dt><dd>CLI-only (no API); separate plugin per level</dd>
+          <dt>Alternatives</dt><dd>General-purpose framing (each phase is its own product); PKM-anchored (vault content is the source data); data-pipeline (ingest a corpus per phase)</dd>
           <dt>Owner</dt><dd>Scott</dd>
         </dl>
       </div>
@@ -1605,21 +1602,6 @@ flowchart LR
       <div class="decision" data-state="accepted">
         <div class="decision-head">
           <span class="decision-id">ADR-004</span>
-          <h3 class="decision-title">Anchor every level in building one growing personal assistant</h3>
-          <span class="status" data-status="approved" data-editable></span>
-        </div>
-        <p><strong>Context.</strong> We need a unifying theme across ten levels that absorbs the breadth of the curriculum (chat, memory, skills, evals, tools, agents) without contortion. We considered three framings: general-purpose-each-app, PKM-anchored-vault, and conversation-anchored-assistant. The strongest analogs we studied (gptme, simonw/llm, Cline, Claude Code itself) are personal assistants that grew capabilities over time, not pipelines over corpora.</p>
-        <p><strong>Decision.</strong> Every level contributes to one growing personal assistant. The assistant talks to the user (<a class="xref" href="#l1">L1</a>&ndash;<a class="xref" href="#l2">L2</a>), learns about the user (<a class="xref" href="#l3">L3</a>), develops skills for the user&rsquo;s recurring tasks (<a class="xref" href="#l4">L4</a>), is graded on its work (<a class="xref" href="#l5">L5</a>), gains tools when the conversation demands them (<a class="xref" href="#l6">L6</a>&ndash;<a class="xref" href="#l7">L7</a>), proposes its own new skills (<a class="xref" href="#l8">L8</a>), takes on long-horizon work (<a class="xref" href="#l9">L9</a>), and improves itself over time (<a class="xref" href="#l10">L10</a>). The Obsidian vault is the memory substrate where everything the assistant knows lives. External surfaces (Bluesky, web, calendars) are <em>tools the assistant earns</em>, not the foundational substrate.</p>
-        <p><strong>Consequences.</strong> Apps feel like one product family (the assistant grew). Each level is immediately personally useful (L1 alone is a chat tool you use daily; L4 is a personalized agent before any tool fires). External-integration risk is bounded: if Bluesky or any other tool turns out to be the wrong fit at L9, it gets swapped without disturbing L1&ndash;L8. The Obsidian-plugin SaaS direction stays credible: the assistant is exactly the kind of thing PKM users want as a plugin, but the assistant is the product, not the plugin.</p>
-        <dl class="decision-meta">
-          <dt>Alternatives</dt><dd>General-purpose framing (each level is its own product); PKM-anchored (vault content is the source data); data-pipeline (ingest a corpus per level)</dd>
-          <dt>Owner</dt><dd>Scott</dd>
-        </dl>
-      </div>
-
-      <div class="decision" data-state="accepted">
-        <div class="decision-head">
-          <span class="decision-id">ADR-005</span>
           <h3 class="decision-title">Skills-spec compliance from day one</h3>
           <span class="status" data-status="approved" data-editable></span>
         </div>
@@ -1634,45 +1616,15 @@ flowchart LR
 
       <div class="decision" data-state="accepted">
         <div class="decision-head">
-          <span class="decision-id">ADR-006</span>
-          <h3 class="decision-title">Use pydantic-ai as the provider abstraction layer</h3>
-          <span class="status" data-status="approved" data-editable></span>
-        </div>
-        <p><strong>Context.</strong> <a href="#decisions">ADR-001</a> commits us to OpenAI through the build phase, and <a class="xref" href="#I7">I7</a> commits us to hand-rolling the agent harness. We still want future provider expansion (Anthropic, Gemini, open-weight via Ollama) to be a config change, not a code change. Three shapes considered: a thin in-repo <code>app.provider.LLM</code> wrapper (more code, no community-tested provider parity); a gateway daemon like <a href="https://github.com/openclaw/openclaw">openclaw</a> (multi-channel reach we do not need here, heavier ops surface); <a href="https://github.com/pydantic/pydantic-ai">pydantic-ai</a> (model-agnostic Agent/Model interface from the Pydantic team, lightweight, Pythonic, type-safe). Pydantic-ai is the shape we&rsquo;d hand-roll anyway, and it&rsquo;s already permitted by <a href="#decisions">ADR-002</a>&rsquo;s amendment.</p>
-        <p><strong>Decision.</strong> Use pydantic-ai as the provider/model layer. App code uses pydantic-ai&rsquo;s <code>Agent</code> / <code>Model</code> types and Pydantic result types; it never imports <code>openai</code> directly. Provider swap is a model-string change in config (<code>openai:gpt-4o-mini</code> → <code>anthropic:claude-haiku-4-5</code>). The hand-rolled agent harness (loop, memory, skills, planner/worker per <a class="xref" href="#I7">I7</a>) sits on top of pydantic-ai&rsquo;s per-call provider abstraction. Specific levels may opt to use more of pydantic-ai (e.g., its built-in tool dispatch) as deliberate detours per ADR-002&rsquo;s amendment.</p>
-        <p><strong>Consequences.</strong> One small framework dep (pydantic-ai) added at L1, targeted at exactly this seam. Type safety throughout (Pydantic-native return types). Provider portability becomes config. <a class="xref" href="#I7">I7</a> stays intact for the agent harness; pydantic-ai&rsquo;s role is the narrow provider/model layer, not the full agent loop. Embeddings route through the indexer&rsquo;s own provider-agnostic interface (e.g., <code>chromadb</code>&rsquo;s embedding functions), not through pydantic-ai.</p>
-        <dl class="decision-meta">
-          <dt>Alternatives</dt><dd>Direct OpenAI SDK calls everywhere (prior draft); thin in-repo <code>app.provider.LLM</code> wrapper (more glue code, no community parity); <code>litellm</code> (procedural, less type-safe, ergonomically clunkier for structured outputs); gateway daemon like <a href="https://github.com/openclaw/openclaw">openclaw</a> (multi-channel reach not needed here; could still be layered behind pydantic-ai later if a level wants it)</dd>
-          <dt>Owner</dt><dd>Scott</dd>
-        </dl>
-      </div>
-
-      <div class="decision" data-state="accepted">
-        <div class="decision-head">
-          <span class="decision-id">ADR-007</span>
-          <h3 class="decision-title">Multi-principal from day one (human user plus agent users)</h3>
-          <span class="status" data-status="approved" data-editable></span>
-        </div>
-        <p><strong>Context.</strong> The assistant has at least two users: the author (human) and Claude Code (an agent acting on the author&rsquo;s behalf). Multi-principal support is much cheaper to design in at init than to retrofit at branch 7. A single-principal design embeds &ldquo;the user&rdquo; everywhere (in session IDs, memory tables, trace partitions, recall corpora) and retrofitting requires a migration on every persisted artifact.</p>
-        <p><strong>Decision.</strong> Every API call identifies its calling principal (header for HTTP, argument for CLI). Conversation sessions, semantic-recall corpora, declarative-memory user-facts, and trace records are partitioned by principal. Skills, shared project knowledge, and global facts are not partitioned. Authentication is simple from init (header-based API keys for agent principals; OS user for the local CLI) and can grow without schema change.</p>
-        <p><strong>Consequences.</strong> An extra header/argument flows through every endpoint and persistence call from L1. Memory stores carry a <code>principal</code> column or directory partition. Claude Code can ask the assistant &ldquo;what do you remember about Scott?&rdquo; through the same API surface the human CLI uses; the assistant can hold distinct memories about Claude Code itself separately from memories about Scott.</p>
-        <dl class="decision-meta">
-          <dt>Alternatives</dt><dd>Single-user with retrofit later (deferred cost much higher); multi-tenant with full RBAC (too heavy for the curriculum); per-process principal pinning (no programmatic principal switching, breaks the Claude-Code-as-second-user goal)</dd>
-          <dt>Owner</dt><dd>Scott</dd>
-        </dl>
-      </div>
-
-      <div class="decision" data-state="accepted">
-        <div class="decision-head">
-          <span class="decision-id">ADR-008</span>
+          <span class="decision-id">ADR-005</span>
           <h3 class="decision-title">One repo, one main branch, dev-cycle progression</h3>
           <span class="status" data-status="approved" data-editable></span>
         </div>
-        <p><strong>Context.</strong> The original plan called for ten standalone GitHub repos, each frozen at the level it shipped. That framing collides with the reality of building a single persistent assistant: refactoring earlier branches as the architecture matures is the whole point. Ten frozen artifacts can&rsquo;t answer &ldquo;what does the latest version of the assistant look like?&rdquo; with a single URL.</p>
-        <p><strong>Decision.</strong> One repository (<code>assistant/</code>), one <code>main</code> branch, ten feature branches landed in sequence. Each branch adds one capability, ships with tests + eval suite + CHANGELOG entry + NOTES.md addition, and merges to main. The repo&rsquo;s git history (PR chain, tagged releases, CHANGELOG) is the portfolio artifact, not ten separate repos. Refactoring earlier code as the architecture matures is expected; later branches may revise scaffolding from earlier branches.</p>
-        <p><strong>Consequences.</strong> The portfolio reads as one growing product instead of a curriculum of toys. <em>Reverses</em> the prior <a class="xref" href="#NG4">NG4</a>: continuous maintenance is the whole point now. The DOD checklist becomes per-branch (CHANGELOG entry, NOTES section, eval suite update) rather than per-repo (README, license, CI). The init commit absorbs the scaffolding work (FastAPI, pydantic-ai, structlog, principal plumbing, provider config) that would otherwise have been redrawn ten times.</p>
+        <p><strong>Context.</strong> A portfolio of capabilities can ship as separate frozen repos or as one evolving repo. Building a single persistent assistant means earlier code is refactored as the architecture matures; ten frozen artifacts cannot answer &ldquo;what does the latest version of the assistant look like?&rdquo; with a single URL.</p>
+        <p><strong>Decision.</strong> One repository (<code>assistant/</code>), one <code>main</code> branch, ten feature branches landed in sequence. Each feature branch delivers one phase, ships with tests + eval suite + CHANGELOG entry + NOTES.md addition, and merges to main. The repo&rsquo;s git history (PR chain, tagged releases, CHANGELOG) is the portfolio artifact. Refactoring earlier code as the architecture matures is expected; later phases may revise scaffolding from earlier phases.</p>
+        <p><strong>Consequences.</strong> The portfolio reads as one growing product instead of a curriculum of toys. Continuous maintenance of earlier code is expected, not avoided. The DOD checklist is per-phase (CHANGELOG entry, NOTES section, eval suite update) rather than per-repo (README, license, CI). The init commit absorbs the scaffolding work (FastAPI, pydantic-ai, Logfire instrumentation, structlog, provider config) that would otherwise have been redrawn ten times.</p>
         <dl class="decision-meta">
-          <dt>Alternatives</dt><dd>Ten standalone repos (original framing; rejected because it doesn&rsquo;t survive contact with &ldquo;one assistant&rdquo;); monorepo with per-branch subfolders (introduces sub-project boundaries that don&rsquo;t earn their complexity); release branches per capability (more git ceremony than needed for a single-author project)</dd>
+          <dt>Alternatives</dt><dd>Ten standalone repos, one per capability (cannot show the latest assistant at one URL; no shared refactoring); monorepo with per-phase subfolders (introduces sub-project boundaries that don&rsquo;t earn their complexity); release branches per capability (more git ceremony than needed for a single-author project)</dd>
           <dt>Owner</dt><dd>Scott</dd>
         </dl>
       </div>
@@ -1680,46 +1632,47 @@ flowchart LR
 
     <section>
       <h2 id="patterns">Cross-cutting patterns</h2>
-      <p class="lede">Patterns that surfaced across the analog research and become load-bearing structures of the portfolio: designed once, reused across levels.</p>
+      <p class="lede">Patterns that surfaced across the analog research and become load-bearing structures of the portfolio: designed once, reused across phases. These are application-layer patterns; the model-call loop is pydantic-ai&rsquo;s job.</p>
 
       <h3>Memory-as-files</h3>
-      <p>The dominant memory pattern for code agents in 2026 (cline Memory Bank, kepano skills, obsidian-mind). The vault <em>is</em> the memory. The assistant reads markdown on session start, writes markdown when it learns something, and amends markdown when facts change. No database needed for the long-term tier. Procedural memory equals a markdown playbook. Central to <a class="xref" href="#l3">L3</a>, <a class="xref" href="#l4">L4</a>, and <a class="xref" href="#l8">L8</a>.</p>
+      <p>The dominant memory pattern for code agents in 2026 (cline Memory Bank, kepano skills, obsidian-mind). The vault <em>is</em> the memory. The assistant reads markdown on session start, writes markdown when it learns something, and amends markdown when facts change. No database needed for the long-term tier. Procedural memory equals a markdown playbook. Central to Phase <a class="xref" href="#l3">3</a>, Phase <a class="xref" href="#l4">4</a>, and Phase <a class="xref" href="#l8">8</a>.</p>
 
       <h3>Conversation-as-corpus</h3>
-      <p>The assistant&rsquo;s growing chat history is itself the retrievable corpus for <a class="xref" href="#l2">L2</a>. No external dataset needed; the substrate is whatever you&rsquo;ve actually talked about. Same retrieval primitives (embeddings + BM25 + recency) that would be applied to external documents in the original PKM framing now apply to your own past exchanges.</p>
+      <p>The assistant&rsquo;s growing chat history is itself the retrievable corpus for Phase <a class="xref" href="#l2">2</a>. No external dataset needed; the substrate is whatever you&rsquo;ve actually talked about. Same retrieval primitives (embeddings + BM25 + recency) that a PKM tool would apply to external documents now apply to your own past exchanges.</p>
 
       <h3>Plan/build agent split</h3>
-      <p>Two-role pattern in <a href="https://github.com/sst/opencode">opencode</a> (<code>plan</code>/<code>build</code>), Aider (architect/editor), SWE-agent. One agent reads-and-proposes (read-only safety), another applies edits. More reliable than multi-agent free-for-alls: Cognition&rsquo;s <a href="https://cognition.ai/blog/dont-build-multi-agents">Don&rsquo;t Build Multi-Agents</a> argues this directly. Used at <a class="xref" href="#l9">L9</a>.</p>
+      <p>Two-role pattern in <a href="https://github.com/sst/opencode">opencode</a> (<code>plan</code>/<code>build</code>), Aider (architect/editor), SWE-agent. One agent reads-and-proposes, another applies edits. The split is a safety boundary: the planner holds no write tools, so a bad plan costs nothing until the worker acts on it. We accept the cost the split adds (a typed handoff between two agents) for that boundary. Used at Phase <a class="xref" href="#l9">9</a>.</p>
 
-      <h3 id="vault-primitives">Vault-write primitives (introduced in branch 1, reused forever)</h3>
-      <p>Three primitives lifted from Ar9av&rsquo;s conventions, designed once in branch 1&rsquo;s vault-write layer for session transcripts and reused for every subsequent kind of write (memory updates, skill drafts, dossier sections):</p>
+      <h3 id="vault-primitives">Vault-write primitives (introduced in phase 1, reused forever)</h3>
+      <p>Three primitives lifted from Ar9av&rsquo;s conventions, designed once in phase 1&rsquo;s vault-write layer for session transcripts and reused for every subsequent kind of write (memory updates, skill drafts, dossier sections):</p>
       <ul>
         <li><strong>Manifest with SHA-256 content-hash delta tracking</strong>: skip re-write on hash match.</li>
         <li><strong>Staging directory + <code>.patch.md</code> files</strong>: agent proposes diffs against existing pages, never blind-overwrites.</li>
         <li><strong>Provenance markers</strong> (<code>^[inferred]</code>, <code>^[ambiguous]</code>) plus <code>provenance:</code> frontmatter ratios. These distinguish what the assistant knows directly from what it inferred.</li>
       </ul>
+      <p>One more constraint at this layer: foreground chat and background jobs (fact extraction in phase 3, skill drafting in phase 8, self-improvement in phase 10) all write the vault. Writes serialize through a single writer (a lock or a write queue) and land via atomic rename, so no two writers touch the same file at once.</p>
 
       <h3>Three-tier structured-output retry (kytmanov)</h3>
-      <p>Tier 1: native structured outputs. Tier 2: regex extraction from a fenced block. Tier 3: retry with prior validation error embedded in the prompt. Treats the model as a self-correcting compiler. First used at <a class="xref" href="#l4">L4</a> (validating skill frontmatter on load) and <a class="xref" href="#l6">L6</a> (parsing tool-call JSON); reused wherever schema validation fails downstream.</p>
+      <p>Tier 1: native structured outputs. Tier 2: regex extraction from a fenced block. Tier 3: retry with prior validation error embedded in the prompt. Treats the model as a self-correcting compiler. First used at Phase <a class="xref" href="#l4">4</a> (validating skill frontmatter on load) and Phase <a class="xref" href="#l6">6</a> (parsing tool-call JSON); reused wherever schema validation fails downstream.</p>
 
       <h3>Skills-spec progressive disclosure (Anthropic)</h3>
-      <p>Three load levels: (1) <code>name</code> + <code>description</code> always in context (~100 tok/skill); (2) body loaded on match; (3) <code>references/</code> and <code>scripts/</code> loaded only when the workflow points to them. We mirror this for our own assistant&rsquo;s skill catalog from <a class="xref" href="#l4">L4</a> onward; agent-written skills at <a class="xref" href="#l8">L8</a> follow the same shape.</p>
+      <p>Three load levels: (1) <code>name</code> + <code>description</code> always in context (~100 tok/skill); (2) body loaded on match; (3) <code>references/</code> and <code>scripts/</code> loaded only when the workflow points to them. We mirror this for our own assistant&rsquo;s skill catalog from Phase <a class="xref" href="#l4">4</a> onward; agent-written skills at Phase <a class="xref" href="#l8">8</a> follow the same shape.</p>
     </section>
 
     <section>
       <h2 id="eval">Eval strategy: solving the no-SME problem</h2>
       <p class="lede">Without a domain expert to grade outputs, evaluations must be deterministic, judged-by-rubric, or trajectory-based.</p>
 
-      <p>Three reusable strategies the portfolio mixes per level:</p>
+      <p>Three reusable strategies the portfolio mixes per phase:</p>
       <ol>
-        <li><strong>Verifiable domains.</strong> Tasks where correctness is mechanical: stream-cancel correctness, persistence round-trip, retrieval (labeled past-exchange found?), planted-fact recall, skill-match precision, schema validation. Branch <a class="xref" href="#l1">1</a> persistence, branch <a class="xref" href="#l2">2</a> retrieval, branch <a class="xref" href="#l3">3</a> memory probes, branch <a class="xref" href="#l4">4</a> skill match, branch <a class="xref" href="#l9">9</a> task outcomes use this.</li>
-        <li><strong>LLM-as-judge with rubrics.</strong> Works when the rubric is tight enough that two judges agree. Validate by sampling and self-checking. Branch <a class="xref" href="#l1">1</a> multi-turn coherence, branch <a class="xref" href="#l2">2</a> faithfulness, branch <a class="xref" href="#l4">4</a> skill-following adherence, branch <a class="xref" href="#l8">8</a> agent-drafted skill quality.</li>
-        <li><strong>Trajectory evals.</strong> Score the path, not just the answer: right tool, right order, right args, right number of iterations, unnecessary calls skipped. Catches regressions when outputs look fine. Branch <a class="xref" href="#l6">6</a> onward.</li>
+        <li><strong>Verifiable domains.</strong> Tasks where correctness is mechanical: stream-cancel correctness, persistence round-trip, retrieval (labeled past-exchange found?), planted-fact recall, skill-match precision, schema validation. Phase <a class="xref" href="#l1">1</a> persistence, phase <a class="xref" href="#l2">2</a> retrieval, phase <a class="xref" href="#l3">3</a> memory probes, phase <a class="xref" href="#l4">4</a> skill match, phase <a class="xref" href="#l9">9</a> task outcomes use this.</li>
+        <li><strong>LLM-as-judge with rubrics.</strong> Works when the rubric is tight enough that two judges agree. Validate by sampling and self-checking. Phase <a class="xref" href="#l1">1</a> multi-turn coherence, phase <a class="xref" href="#l2">2</a> faithfulness, phase <a class="xref" href="#l4">4</a> skill-following adherence, phase <a class="xref" href="#l8">8</a> agent-drafted skill quality.</li>
+        <li><strong>Trajectory evals.</strong> Score the path, not just the answer: right tool, right order, right args, right number of iterations, unnecessary calls skipped. Catches regressions when outputs look fine. Phase <a class="xref" href="#l6">6</a> onward.</li>
       </ol>
 
       <div class="callout" data-kind="rationale">
-        <span class="callout-label">Why branch 5 lives where it does</span>
-        <div class="callout-body"><p>The eval harness sits at the pivot because branches 1&ndash;4 can be graded deterministically: the easy way to learn how evals work. By branch 6 the outputs are too open-ended for pure determinism, and we need the eval muscle already trained. Building it after branch 4 is the cheapest possible eval education.</p></div>
+        <span class="callout-label">Why phase 5 lives where it does</span>
+        <div class="callout-body"><p>The eval harness sits at the pivot because phases 1&ndash;4 can be graded deterministically: the easy way to learn how evals work. By phase 6 the outputs are too open-ended for pure determinism, and we need the eval muscle already trained. Building it after phase 4 is the cheapest possible eval education.</p></div>
       </div>
     </section>
 
@@ -1731,34 +1684,34 @@ flowchart LR
         </thead>
         <tbody>
           <tr>
-            <td>Scope creep: &ldquo;production&rdquo; quality gets confused with enterprise quality; branches drag on.</td>
+            <td>Scope creep: &ldquo;production&rdquo; quality gets confused with enterprise quality; phases drag on.</td>
             <td class="severity" data-sev="high">High</td>
             <td>Likely</td>
-            <td>Strict definition-of-done per level. Ship at &ldquo;good enough for a public repo&rdquo;, not &ldquo;deployable to paying customers.&rdquo;</td>
+            <td>Strict definition-of-done per phase. Ship at &ldquo;good enough for a public repo&rdquo;, not &ldquo;deployable to paying customers.&rdquo;</td>
           </tr>
           <tr>
-            <td>Branch 10 has no production analog and may become an indefinite research project.</td>
+            <td>Phase 10 has no production analog and may become an indefinite research project.</td>
             <td class="severity" data-sev="med">Medium</td>
             <td>Likely</td>
             <td>Time-box at two weeks. If the loop doesn&rsquo;t close, ship as a writeup-heavy capstone rather than full code.</td>
           </tr>
           <tr>
-            <td>Eval costs balloon when branch 5 retro-applies to branches 1&ndash;4.</td>
+            <td>Eval costs balloon when phase 5 retro-applies to phases 1&ndash;4.</td>
             <td class="severity" data-sev="med">Medium</td>
             <td>Possible</td>
             <td>Cache LLM-as-judge calls aggressively (<code>diskcache</code>); use small models for judging where feasible.</td>
           </tr>
           <tr>
-            <td>Memory accumulation drift: after months of conversations the branch-3 declarative store goes stale or self-contradicts.</td>
+            <td>Memory accumulation drift: after months of conversations the phase-3 declarative store goes stale or self-contradicts.</td>
             <td class="severity" data-sev="med">Medium</td>
             <td>Likely</td>
-            <td>Branch 3 includes contradiction-on-update logic (newer facts override older with citation). Branch 5 grades memory recency and consistency as part of routine eval runs.</td>
+            <td>Phase 3 includes contradiction-on-update logic (newer facts override older with citation). Phase 5 grades memory recency and consistency as part of routine eval runs.</td>
           </tr>
           <tr>
             <td>User-as-only-tester limitation: the author is the only daily user, so eval coverage skews to one person&rsquo;s patterns.</td>
             <td class="severity" data-sev="med">Medium</td>
             <td>Possible</td>
-            <td>Branch 5 fixtures include synthesized chat sessions across distinct user personas. Invite at least one external user by branch 4 to widen the trace surface.</td>
+            <td>Phase 5 fixtures include synthesized chat sessions across distinct user personas. Invite at least one external user by phase 4 to widen the trace surface.</td>
           </tr>
           <tr>
             <td>Markdown / vault format assumptions break (Obsidian Bases spec, frontmatter conventions, wikilink semantics).</td>
@@ -1767,10 +1720,22 @@ flowchart LR
             <td>Pin to <a href="https://agentskills.io/specification">agentskills.io</a> spec where applicable. Vault is plain files; Obsidian-specific surface is a thin adapter, not core code.</td>
           </tr>
           <tr>
-            <td>Refactor-creep on earlier branches: each new branch&rsquo;s &ldquo;allowed and expected&rdquo; refactoring of earlier code expands until shipping the new capability stalls.</td>
+            <td>Refactor-creep on earlier phases: each new phase&rsquo;s &ldquo;allowed and expected&rdquo; refactoring of earlier code expands until shipping the new capability stalls.</td>
             <td class="severity" data-sev="med">Medium</td>
             <td>Likely</td>
-            <td>Refactor budget per branch (rough wall-clock cap; e.g., max one day of refactoring vs the new capability). CHANGELOG entries call out incidental refactors so they&rsquo;re visible in review. If the refactor wants to be bigger, it becomes its own branch.</td>
+            <td>Refactor budget per phase (rough wall-clock cap; e.g., max one day of refactoring vs the new capability). CHANGELOG entries call out incidental refactors so they&rsquo;re visible in review. If the refactor wants to be bigger, it becomes its own branch.</td>
+          </tr>
+          <tr>
+            <td>Eval-fixture drift: as later phases change behavior, an early fixture (e.g., a phase-2 retrieval fixture expecting a recall answer) silently stops applying once a tool satisfies the same query.</td>
+            <td class="severity" data-sev="med">Medium</td>
+            <td>Likely</td>
+            <td>Per-phase fixture-maintenance budget, parallel to the refactor budget: each phase re-baselines the fixtures its changes invalidate. Drifted fixtures are fixed or retired, never left silently failing.</td>
+          </tr>
+          <tr>
+            <td>Prior art: <a href="https://github.com/NousResearch/hermes-agent">NousResearch/hermes-agent</a>, a shipped product, already implements roughly this phase 1&ndash;10 trajectory.</td>
+            <td class="severity" data-sev="low">Low</td>
+            <td>Certain</td>
+            <td>The portfolio is a learning artifact and an interview credential, not a competing product. Cite hermes-agent as prior art and study its architecture; the value is the documented build and the author&rsquo;s ability to defend every decision, not novelty.</td>
           </tr>
         </tbody>
       </table>
@@ -1778,7 +1743,7 @@ flowchart LR
 
     <section>
       <h2>Acceptance: definition of done</h2>
-      <p>Two DOD checklists. The <em>init</em> commit must clear the repo-level list once. Every <em>branch</em> must clear the per-branch list before merging to <code>main</code>.</p>
+      <p>Two DOD checklists. The <em>init</em> commit must clear the repo-level list once. Every <em>phase</em> must clear the per-phase list before its feature branch merges to <code>main</code>.</p>
 
       <h3>Init (one-time, repo scaffolding)</h3>
       <ol class="tasks">
@@ -1787,20 +1752,19 @@ flowchart LR
         <li data-status="todo"><span class="task-check" aria-label="cycle status"></span><span class="task-text" contenteditable="true">Ruff + mypy clean; CI smoke test on push</span><span class="task-owner">scott</span><span class="task-est">-</span></li>
         <li data-status="todo"><span class="task-check" aria-label="cycle status"></span><span class="task-text" contenteditable="true">Configuration via <code>.env</code> + <code>pydantic-settings</code>; <code>.env.example</code> committed</span><span class="task-owner">scott</span><span class="task-est">-</span></li>
         <li data-status="todo"><span class="task-check" aria-label="cycle status"></span><span class="task-text" contenteditable="true">FastAPI backend with OpenAPI spec at <code>/docs</code></span><span class="task-owner">scott</span><span class="task-est">-</span></li>
-        <li data-status="todo"><span class="task-check" aria-label="cycle status"></span><span class="task-text" contenteditable="true">All chat / streaming / structured-output calls route through pydantic-ai&rsquo;s <code>Agent</code> / <code>Model</code> (no direct <code>openai</code> imports in app code) per ADR-006</span><span class="task-owner">scott</span><span class="task-est">-</span></li>
-        <li data-status="todo"><span class="task-check" aria-label="cycle status"></span><span class="task-text" contenteditable="true">Every API call identifies its principal (header or CLI argument); persistence carries the principal column per ADR-007</span><span class="task-owner">scott</span><span class="task-est">-</span></li>
-        <li data-status="todo"><span class="task-check" aria-label="cycle status"></span><span class="task-text" contenteditable="true">LLM calls and tool invocations logged to local SQLite (request, response, cost, latency, principal, session) per I5</span><span class="task-owner">scott</span><span class="task-est">-</span></li>
-        <li data-status="todo"><span class="task-check" aria-label="cycle status"></span><span class="task-text" contenteditable="true">CHANGELOG.md and NOTES.md present; one entry per for the init commit</span><span class="task-owner">scott</span><span class="task-est">-</span></li>
+        <li data-status="todo"><span class="task-check" aria-label="cycle status"></span><span class="task-text" contenteditable="true">All chat / streaming / structured-output calls route through pydantic-ai&rsquo;s <code>Agent</code> / <code>Model</code> (no direct provider-SDK imports in app code) per ADR-001</span><span class="task-owner">scott</span><span class="task-est">-</span></li>
+        <li data-status="todo"><span class="task-check" aria-label="cycle status"></span><span class="task-text" contenteditable="true">LLM calls and tool invocations traced via pydantic-ai&rsquo;s Logfire instrumentation per I5</span><span class="task-owner">scott</span><span class="task-est">-</span></li>
+        <li data-status="todo"><span class="task-check" aria-label="cycle status"></span><span class="task-text" contenteditable="true">CHANGELOG.md and NOTES.md present; one entry each for the init commit</span><span class="task-owner">scott</span><span class="task-est">-</span></li>
       </ol>
 
-      <h3>Per branch (every <code>feat/*</code> merge)</h3>
+      <h3>Per phase (every <code>feat/*</code> merge)</h3>
       <ol class="tasks">
         <li data-status="todo"><span class="task-check" aria-label="cycle status"></span><span class="task-text" contenteditable="true">Capability behaves end-to-end against the real chat surface (not just unit tests)</span><span class="task-owner">scott</span><span class="task-est">-</span></li>
         <li data-status="todo"><span class="task-check" aria-label="cycle status"></span><span class="task-text" contenteditable="true">New tests added; CI green on the branch</span><span class="task-owner">scott</span><span class="task-est">-</span></li>
         <li data-status="todo"><span class="task-check" aria-label="cycle status"></span><span class="task-text" contenteditable="true">Eval suite extended with at least one fixture-bucket / scenario that exercises the new capability</span><span class="task-owner">scott</span><span class="task-est">-</span></li>
         <li data-status="todo"><span class="task-check" aria-label="cycle status"></span><span class="task-text" contenteditable="true">CHANGELOG entry under a new <code>## [unreleased]</code> heading; promoted to a version on merge</span><span class="task-owner">scott</span><span class="task-est">-</span></li>
-        <li data-status="todo"><span class="task-check" aria-label="cycle status"></span><span class="task-text" contenteditable="true">NOTES.md gets a section: the one concept this branch teaches, with code-pointer references</span><span class="task-owner">scott</span><span class="task-est">-</span></li>
-        <li data-status="todo"><span class="task-check" aria-label="cycle status"></span><span class="task-text" contenteditable="true">No regression in earlier capabilities (full eval suite still passes); refactors to earlier code allowed and expected per ADR-008</span><span class="task-owner">scott</span><span class="task-est">-</span></li>
+        <li data-status="todo"><span class="task-check" aria-label="cycle status"></span><span class="task-text" contenteditable="true">NOTES.md gets a section: the one concept this phase teaches, with code-pointer references</span><span class="task-owner">scott</span><span class="task-est">-</span></li>
+        <li data-status="todo"><span class="task-check" aria-label="cycle status"></span><span class="task-text" contenteditable="true">No regression in earlier capabilities (full eval suite still passes); refactors to earlier code allowed and expected per ADR-005</span><span class="task-owner">scott</span><span class="task-est">-</span></li>
       </ol>
     </section>
 
@@ -1810,23 +1774,24 @@ flowchart LR
 
       <h3>Cloned and read</h3>
       <ul>
-        <li><a href="https://github.com/Ar9av/obsidian-wiki">Ar9av/obsidian-wiki</a>: <strong>markdown-only skill collection, NOT a Python agent framework.</strong> Vault-as-memory conventions: manifest, <code>hot.md</code>, staging, provenance markers. <em>Conventions reference for L3 declarative memory and beyond.</em></li>
-        <li><a href="https://github.com/kepano/obsidian-skills">kepano/obsidian-skills</a>: Obsidian CEO&rsquo;s official skill bundle. Format target for our assistant&rsquo;s vault-stored playbooks. <em>Schema reference for L4 and L8.</em></li>
-        <li><a href="https://github.com/kytmanov/obsidian-llm-wiki-local">kytmanov/obsidian-llm-wiki-local</a>: three-tier structured-output retry; fill-in example trees instead of JSON Schema. <em>Pattern reference, not a level-1 analog under the current framing. Used wherever schema validation happens (L4 skill load, L6 tool-call parsing).</em></li>
+        <li><a href="https://github.com/Ar9av/obsidian-wiki">Ar9av/obsidian-wiki</a>: <strong>markdown-only skill collection, NOT a Python agent framework.</strong> Vault-as-memory conventions: manifest, <code>hot.md</code>, staging, provenance markers. <em>Conventions reference for phase 3 declarative memory and beyond.</em></li>
+        <li><a href="https://github.com/kepano/obsidian-skills">kepano/obsidian-skills</a>: Obsidian CEO&rsquo;s official skill bundle. Format target for our assistant&rsquo;s vault-stored playbooks. <em>Schema reference for phase 4 and phase 8.</em></li>
+        <li><a href="https://github.com/kytmanov/obsidian-llm-wiki-local">kytmanov/obsidian-llm-wiki-local</a>: three-tier structured-output retry; fill-in example trees instead of JSON Schema. <em>Pattern reference, not a phase-1 analog. Used wherever schema validation happens (phase 4 skill load, phase 6 tool-call parsing).</em></li>
+        <li><a href="https://github.com/NousResearch/hermes-agent">NousResearch/hermes-agent</a>: a shipped personal assistant with a built-in learning loop: it creates skills from experience, improves them in use, searches its own past conversations, and builds a model of the user across sessions. <em>The closest whole-trajectory prior art to this portfolio; read its architecture before phase 1.</em></li>
       </ul>
 
       <h3>Verified GitHub analogs (active May 2026, &gt;10 stars)</h3>
       <ul>
-        <li><strong>L1</strong> · <a href="https://github.com/Azure-Samples/rag-postgres-openai-python">Azure-Samples/rag-postgres-openai-python</a> (490 stars) · <a href="https://github.com/basicmachines-co/basic-memory">basic-memory</a> (3k stars) · <a href="https://github.com/simonw/llm">simonw/llm</a> (12k stars, CLI shape)</li>
-        <li><strong>L2</strong> · <a href="https://github.com/benmaster82/Kwipu">benmaster82/Kwipu</a> (80 stars) · <a href="https://github.com/basicmachines-co/basic-memory">basic-memory</a> (3k stars) · <a href="https://github.com/Vasallo94/ObsidianRAG">ObsidianRAG</a> (79 stars)</li>
-        <li><strong>L3</strong> · <a href="https://github.com/cline/cline">cline</a> (61k stars, Memory Bank) · <a href="https://github.com/Ar9av/obsidian-wiki">Ar9av/obsidian-wiki</a> (1.4k stars, vault conventions)</li>
-        <li><strong>L4</strong> · <a href="https://github.com/kepano/obsidian-skills">kepano/obsidian-skills</a> (32k stars, format target) · <a href="https://github.com/cline/cline">cline</a> (procedural memory shape)</li>
-        <li><strong>L5</strong> · <a href="https://github.com/meshkovQA/Eval-ai-library">meshkovQA/Eval-ai-library</a> (44 stars) · <a href="https://github.com/openai/evals">openai/evals</a> (18k stars, read but don&rsquo;t template) · <a href="https://github.com/explodinggradients/ragas">ragas</a> (14k stars)</li>
-        <li><strong>L6</strong> · <a href="https://github.com/simonw/llm">simonw/llm</a> (12k stars, <code>_tools.py</code>) · <a href="https://github.com/gptme/gptme">gptme</a> (4.3k stars, loop shape)</li>
-        <li><strong>L7</strong> · <a href="https://github.com/gptme/gptme">gptme</a> (multi-tool loop) · <a href="https://github.com/NirDiamant/Agent_Memory_Techniques">Agent_Memory_Techniques</a> (378 stars, memory-aware routing)</li>
-        <li><strong>L8</strong> · <a href="https://github.com/cline/cline">cline</a> (Memory Bank written by the agent) · <a href="https://github.com/breferrari/obsidian-mind">obsidian-mind</a> (2.6k stars, vault template) · <a href="https://github.com/kepano/obsidian-skills">kepano/obsidian-skills</a></li>
-        <li><strong>L9</strong> · <a href="https://github.com/sst/opencode">sst/opencode</a> (161k stars) · <a href="https://github.com/SWE-agent/SWE-agent">SWE-agent</a> (19k stars) · <a href="https://github.com/All-Hands-AI/OpenHands">OpenHands</a> (70k stars)</li>
-        <li><strong>L10</strong> · <a href="https://github.com/NousResearch/hermes-agent-self-evolution">hermes-agent-self-evolution</a> (3.4k stars, stale Mar 2026) · <a href="https://github.com/stanfordnlp/dspy">DSPy</a> (34k stars) · <a href="https://github.com/EvoAgentX/EvoAgentX">EvoAgentX</a> (3k stars)</li>
+        <li><strong>Phase 1</strong> · <a href="https://github.com/Azure-Samples/rag-postgres-openai-python">Azure-Samples/rag-postgres-openai-python</a> (490 stars) · <a href="https://github.com/basicmachines-co/basic-memory">basic-memory</a> (3k stars) · <a href="https://github.com/simonw/llm">simonw/llm</a> (12k stars, CLI shape)</li>
+        <li><strong>Phase 2</strong> · <a href="https://github.com/benmaster82/Kwipu">benmaster82/Kwipu</a> (80 stars) · <a href="https://github.com/basicmachines-co/basic-memory">basic-memory</a> (3k stars) · <a href="https://github.com/Vasallo94/ObsidianRAG">ObsidianRAG</a> (79 stars)</li>
+        <li><strong>Phase 3</strong> · <a href="https://github.com/cline/cline">cline</a> (61k stars, Memory Bank) · <a href="https://github.com/Ar9av/obsidian-wiki">Ar9av/obsidian-wiki</a> (1.4k stars, vault conventions)</li>
+        <li><strong>Phase 4</strong> · <a href="https://github.com/kepano/obsidian-skills">kepano/obsidian-skills</a> (32k stars, format target) · <a href="https://github.com/cline/cline">cline</a> (procedural memory shape)</li>
+        <li><strong>Phase 5</strong> · <a href="https://github.com/meshkovQA/Eval-ai-library">meshkovQA/Eval-ai-library</a> (44 stars) · <a href="https://github.com/openai/evals">openai/evals</a> (18k stars, read but don&rsquo;t template) · <a href="https://github.com/explodinggradients/ragas">ragas</a> (14k stars)</li>
+        <li><strong>Phase 6</strong> · <a href="https://github.com/simonw/llm">simonw/llm</a> (12k stars, <code>_tools.py</code>) · <a href="https://github.com/gptme/gptme">gptme</a> (4.3k stars, loop shape)</li>
+        <li><strong>Phase 7</strong> · <a href="https://github.com/gptme/gptme">gptme</a> (multi-tool loop) · <a href="https://github.com/NirDiamant/Agent_Memory_Techniques">Agent_Memory_Techniques</a> (378 stars, memory-aware routing)</li>
+        <li><strong>Phase 8</strong> · <a href="https://github.com/cline/cline">cline</a> (Memory Bank written by the agent) · <a href="https://github.com/breferrari/obsidian-mind">obsidian-mind</a> (2.6k stars, vault template) · <a href="https://github.com/kepano/obsidian-skills">kepano/obsidian-skills</a></li>
+        <li><strong>Phase 9</strong> · <a href="https://github.com/sst/opencode">sst/opencode</a> (161k stars) · <a href="https://github.com/SWE-agent/SWE-agent">SWE-agent</a> (19k stars) · <a href="https://github.com/All-Hands-AI/OpenHands">OpenHands</a> (70k stars)</li>
+        <li><strong>Phase 10</strong> · <a href="https://github.com/NousResearch/hermes-agent">hermes-agent</a> (whole-trajectory analog) · <a href="https://github.com/NousResearch/hermes-agent-self-evolution">hermes-agent-self-evolution</a> (3.4k stars) · <a href="https://github.com/stanfordnlp/dspy">DSPy</a> (34k stars) · <a href="https://github.com/EvoAgentX/EvoAgentX">EvoAgentX</a> (3k stars)</li>
       </ul>
 
       <h3>Primary sources</h3>
@@ -1834,8 +1799,7 @@ flowchart LR
         <li><a href="https://agentskills.io/specification">agentskills.io spec</a> <em>(canonical Skills format)</em></li>
         <li><a href="https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills">Anthropic, Equipping agents with Agent Skills</a> <em>(rationale)</em></li>
         <li><a href="https://platform.claude.com/docs/en/docs/agents-and-tools/agent-skills/overview">Anthropic docs, Agent Skills overview</a> <em>(three-level loading model)</em></li>
-        <li><a href="https://cognition.ai/blog/dont-build-multi-agents">Cognition, Don&rsquo;t Build Multi-Agents</a> <em>(context-continuity argument)</em></li>
-        <li><a href="https://www.octomind.dev/blog/why-we-no-longer-use-langchain-for-building-our-ai-agents">Octomind, Why we no longer use LangChain</a> <em>(canonical anti-framework essay)</em></li>
+        <li><a href="https://www.octomind.dev/blog/why-we-no-longer-use-langchain-for-building-our-ai-agents">Octomind, Why we no longer use LangChain</a> <em>(why LangChain&rsquo;s abstractions backfired; grounds NG2)</em></li>
         <li><a href="https://newsletter.pragmaticengineer.com/p/how-claude-code-is-built">Pragmatic Engineer, How Claude Code is built</a> <em>(&ldquo;every model release, we delete code&rdquo;)</em></li>
         <li><a href="https://cursor.com/blog/continually-improving-agent-harness">Cursor, Continually improving our agent harness</a> <em>(model-specific tool formats)</em></li>
       </ul>
