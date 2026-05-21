@@ -50,7 +50,8 @@ _One repository, one persistent personal LLM assistant, built in ten phases. pyd
 - **I5 (invariant).** **Trace.** All LLM calls, tool invocations, token counts, costs, and latencies are captured by pydantic-ai’s native instrumentation (Pydantic Logfire, OpenTelemetry-based: `logfire.instrument_pydantic_ai()`). This is the source for annotations, failure analysis, and evals. Logfire cloud to start; because the data is standard OpenTelemetry, moving to a local collector later is a config change. Non-negotiable from phase 1.
 - **I6 (invariant).** Every markdown file our agents write to the vault that contains agent-readable instructions is `§Skills-spec compliant`. _(Open question: verify the Skills-spec frontmatter is also Obsidian-compatible so the same file renders cleanly in the vault.)_
 - **I7 (invariant).** Pydantic-ai is the only agent framework we import; it owns the model-call layer (per-agent loop, tool dispatch, retries, structured outputs, streaming) per [ADR-001](#decisions). Everything above it is hand-rolled in our repo: memory store, skill catalog, eval harness, skill drafting, planner/worker contract, self-improvement loop. No LangChain, CrewAI, LlamaIndex, OpenAI Agents SDK, or Claude Agent SDK.
-- **I8 (invariant).** App code never imports a provider SDK directly. Chat, streaming, and structured-output calls route through pydantic-ai’s `Agent` / `Model` interface (per ADR-001). Embeddings route through the indexer’s provider-agnostic interface (e.g., `chromadb`’s embedding functions). Provider swap is a model-string change in config, not a code change.
+- **I8 (invariant).** Writes to external systems (any social-platform or third-party API write a future tool introduces) are scoped to bot or sandbox accounts owned by the author. Reads can be global, subject to platform terms and rate limits. Larger public-figure accounts that opt into bot interaction can be allowlisted; default-deny on writes otherwise. Protects against accidental notification spam to non-consenting users and keeps the portfolio defensible.
+- **I9 (invariant).** App code never imports a provider SDK directly. Chat, streaming, and structured-output calls route through pydantic-ai’s `Agent` / `Model` interface (per ADR-001). Embeddings route through the indexer’s provider-agnostic interface (e.g., `chromadb`’s embedding functions). Provider swap is a model-string change in config, not a code change.
 
 ## 05. Context
 
@@ -121,7 +122,7 @@ One repo (`assistant/`), one main branch, one persistent product. The portfolio 
 
 **Decisions baked in at init.** ADR-001 (pydantic-ai for the model layer, hand-rolled application layer), ADR-002 (FastAPI), ADR-003 (one growing assistant), ADR-005 (one repo, dev cycle).
 
-**DOD.** Provider abstraction enforced (`§I8`), traces logging (`§I5`), eval fixture loadable, smoke test green.
+**DOD.** Provider abstraction enforced (`§I9`), traces logging (`§I5`), eval fixture loadable, smoke test green.
 
 ### Phase 1 · `feat/transcripts`
 
