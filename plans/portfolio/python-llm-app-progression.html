@@ -1,0 +1,2720 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Understanding how Python LLM apps grow into agents | Atelier Plans</title>
+  <meta name="description" content="A 10-level public GitHub progression that builds one growing personal LLM assistant. Conversation is the substrate, the Obsidian vault is the memory store, tools are added when the assistant earns them. Hand-rolled on OpenAI + FastAPI.">
+
+  <style id="plan-css-inline">
+/* ============================================================
+   Atelier Plans: visual system for HTML planning documents
+   Original design. Warm parchment / terracotta / moss.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  /* color */
+  --ink:           #1E1B16;
+  --ink-muted:     #6C6557;
+  --ink-faint:     #9A9384;
+  --canvas:        #F7F4EE;
+  --surface-1:     #EFEAE0;
+  --surface-2:     #E5DFD2;
+  --border:        #D6CFBE;
+  --border-strong: #B8B0A0;
+  --primary:       #B8462B;
+  --primary-hover: #9A3820;
+  --primary-soft:  #F1D4C5;
+  --moss:          #3D5A4C;
+  --moss-soft:     #D6E0D9;
+  --ochre:         #B07B1F;
+  --ochre-soft:    #EDDFBE;
+  --code-bg:       #EBE5D6;
+  --highlight:     #FAEAB0;
+
+  /* type */
+  --font-display: 'Instrument Serif', Georgia, serif;
+  --font-body:    'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* spacing scale (8px base) */
+  --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;
+  --s-5: 24px; --s-6: 32px; --s-7: 48px; --s-8: 64px;
+  --s-9: 96px; --s-10: 128px;
+
+  /* radii */
+  --r-sm: 4px; --r-md: 6px; --r-lg: 12px; --r-pill: 9999px;
+
+  /* shadows */
+  --shadow-card:     0 1px 0 rgba(30,27,22,0.04), 0 1px 2px rgba(30,27,22,0.04);
+  --shadow-elevated: 0 4px 24px rgba(30,27,22,0.08);
+  --shadow-focus:    0 0 0 2px var(--canvas), 0 0 0 4px var(--primary);
+
+  /* layout */
+  --col-body:  min(72ch, 100%);
+  --col-wide:  min(96ch, 100%);
+  --col-full:  100%;
+  --rail-w:    260px;
+}
+
+/* ---------- reset ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 16.5px;
+  line-height: 1.62;
+  letter-spacing: -0.005em;
+  color: var(--ink);
+  background: var(--canvas);
+  font-feature-settings: "ss01", "cv11";
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: var(--primary-soft); color: var(--ink); }
+
+/* ---------- page chrome ---------- */
+.page {
+  display: grid;
+  grid-template-columns: 1fr minmax(0, 760px) var(--rail-w) 1fr;
+  gap: 0 var(--s-7);
+  padding: var(--s-7) var(--s-6) var(--s-9);
+}
+.page > .doc      { grid-column: 2 / 3; min-width: 0; }
+.page > .rail     { grid-column: 3 / 4; }
+.page > .topbar   { grid-column: 1 / -1; }
+
+@media (max-width: 1100px) {
+  .page { grid-template-columns: 1fr minmax(0, 760px) 1fr; }
+  .page > .doc  { grid-column: 2 / 3; }
+  .page > .rail { display: none; }
+}
+@media (max-width: 720px) {
+  .page { padding: var(--s-5) var(--s-4) var(--s-7); }
+}
+
+/* ---------- top bar ---------- */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  padding: var(--s-3) 0 var(--s-6);
+  margin-bottom: var(--s-4);
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.topbar .crumbs {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-muted);
+  letter-spacing: -0.01em;
+}
+.topbar .crumbs a { color: inherit; }
+.topbar .crumbs .sep { opacity: 0.4; margin: 0 6px; }
+.topbar .spacer { flex: 1; }
+.topbar .btn-row { display: flex; gap: var(--s-2); }
+
+/* ---------- buttons ---------- */
+.btn {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: var(--r-md);
+  background: var(--canvas);
+  color: var(--ink);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 120ms, border-color 120ms, color 120ms;
+}
+.btn:hover  { background: var(--surface-1); border-color: var(--border-strong); }
+.btn:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
+.btn.primary  { background: var(--primary); color: #fff; border-color: var(--primary); }
+.btn.primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
+.btn.ghost    { background: transparent; border-color: transparent; color: var(--ink-muted); }
+.btn.ghost:hover { color: var(--ink); background: var(--surface-1); }
+.btn .kbd { font-family: var(--font-mono); font-size: 11px; opacity: 0.6; }
+
+/* dropdown menu (Copy ▾) */
+.btn-menu-wrap { position: relative; }
+.btn-menu-wrap > .btn[data-menu-toggle]::after {
+  content: "▾";
+  margin-left: 4px;
+  opacity: 0.6;
+  font-size: 10px;
+}
+.btn-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: var(--canvas);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-elevated);
+  padding: 4px;
+  min-width: 260px;
+  z-index: 1000;
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+}
+.btn-menu-wrap.open .btn-menu { display: flex; }
+.btn-menu > button {
+  font: inherit;
+  font-size: 13px;
+  background: none;
+  border: none;
+  padding: 8px 12px;
+  text-align: left;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.btn-menu > button:hover { background: var(--surface-1); }
+.btn-menu > button .menu-label { font-weight: 500; }
+.btn-menu > button .menu-hint {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-faint);
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+}
+
+/* ---------- header / meta ---------- */
+.doc-header { margin-bottom: var(--s-7); }
+.doc-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin-bottom: var(--s-3);
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+}
+.doc-eyebrow .dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--primary);
+}
+.doc-title {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(40px, 6.2vw, 64px);
+  line-height: 1.02;
+  letter-spacing: -0.025em;
+  margin: 0 0 var(--s-3);
+  color: var(--ink);
+  text-wrap: balance;
+}
+.doc-title em {
+  font-style: italic;
+  color: var(--primary);
+}
+.doc-summary {
+  font-size: 19px;
+  line-height: 1.5;
+  color: var(--ink-muted);
+  margin: 0 0 var(--s-5);
+  max-width: 60ch;
+  text-wrap: pretty;
+}
+.doc-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-5);
+  font-size: 13px;
+  padding-top: var(--s-4);
+  border-top: 1px solid var(--border);
+}
+.doc-meta dt {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-faint);
+  margin-bottom: 2px;
+}
+.doc-meta dd { margin: 0; color: var(--ink); }
+.doc-meta dd a { color: var(--primary); }
+
+/* status pill in header */
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 8px;
+  border-radius: var(--r-pill);
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+  color: var(--ink);
+}
+.status::before {
+  content: ""; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--ink-faint);
+}
+.status[data-status="draft"]    { background: var(--surface-1); }
+.status[data-status="draft"]::before    { background: var(--ink-faint); }
+.status[data-status="in-review"]{ background: var(--ochre-soft); border-color: #E0C988; }
+.status[data-status="in-review"]::before{ background: var(--ochre); }
+.status[data-status="approved"] { background: var(--moss-soft); border-color: #B5C6BB; }
+.status[data-status="approved"]::before { background: var(--moss); }
+.status[data-status="shipped"]  { background: var(--primary-soft); border-color: #E2B59C; color: var(--primary-hover); }
+.status[data-status="shipped"]::before  { background: var(--primary); }
+.status[data-status="blocked"]  { background: #F4D9CF; border-color: #E0B19E; }
+.status[data-status="blocked"]::before  { background: #B83A1E; }
+
+/* tag chips */
+.tags { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.tag {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  background: var(--surface-1);
+  color: var(--ink-muted);
+  border: 1px solid var(--border);
+}
+
+/* ---------- spec relations (Depends on / Blocks / Supersedes / Amended) ---------- */
+.relations {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: var(--s-2) var(--s-4);
+  margin: var(--s-5) 0 0;
+  padding-top: var(--s-4);
+  border-top: 1px dashed var(--border);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+.relation { display: contents; }
+.relation-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  padding-top: 3px;
+}
+.relation-body { color: var(--ink); }
+.relation-body code, .relation-body a {
+  white-space: nowrap;
+}
+.relation[data-kind="blocks"]   .relation-label { color: var(--primary); }
+.relation[data-kind="depends"]  .relation-label { color: var(--moss); }
+.relation[data-kind="amended"]  .relation-label { color: var(--ochre); }
+
+/* amendment note: short "this doc was amended" header annotation */
+.amendment {
+  margin: var(--s-5) 0 0;
+  padding: 2px 0 2px var(--s-4);
+  background: transparent;
+  border-left: 2px solid var(--ochre);
+  border-radius: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--s-3);
+  align-items: baseline;
+  color: var(--ink-muted);
+}
+.amendment-label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ochre);
+  white-space: nowrap;
+}
+.amendment p { margin: 0; }
+
+/* ---------- prose ---------- */
+.doc h1, .doc h2, .doc h3, .doc h4 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  text-wrap: balance;
+  scroll-margin-top: var(--s-6);
+}
+.doc h2 {
+  font-size: 34px;
+  line-height: 1.1;
+  margin: var(--s-8) 0 var(--s-4);
+  padding-top: var(--s-5);
+  border-top: 1px solid var(--border);
+  display: flex; align-items: baseline; gap: var(--s-3);
+}
+.doc h2::before {
+  content: attr(data-num);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-faint);
+  letter-spacing: 0.05em;
+  font-weight: 500;
+  flex-shrink: 0;
+  width: 28px;
+  padding-top: 14px;
+}
+.doc h3 {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 18px;
+  letter-spacing: -0.01em;
+  margin: var(--s-6) 0 var(--s-3);
+  color: var(--ink);
+}
+.doc h4 {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-muted);
+  margin: var(--s-5) 0 var(--s-2);
+}
+.doc p {
+  margin: 0 0 var(--s-4);
+  text-wrap: pretty;
+}
+.doc p.lede {
+  font-size: 19px;
+  line-height: 1.55;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-style: italic;
+  margin-bottom: var(--s-5);
+}
+.doc a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  text-decoration-color: rgba(184, 70, 43, 0.4);
+}
+.doc a:hover { text-decoration-color: currentColor; }
+.doc strong { font-weight: 600; }
+.doc em { font-style: italic; }
+.doc ul, .doc ol { margin: 0 0 var(--s-4); padding-left: var(--s-5); }
+.doc li { margin-bottom: var(--s-2); }
+.doc li::marker { color: var(--ink-faint); }
+.doc blockquote {
+  margin: var(--s-5) 0;
+  padding: 0 0 0 var(--s-4);
+  border-left: 2px solid var(--primary);
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 19px;
+  line-height: 1.45;
+  color: var(--ink);
+}
+.doc hr {
+  border: none;
+  height: 1px;
+  background: var(--border);
+  margin: var(--s-7) 0;
+}
+
+/* leading drop-cap (optional, .doc.intro > p:first-of-type) */
+.doc .drop-cap::first-letter {
+  font-family: var(--font-display);
+  float: left;
+  font-size: 64px;
+  line-height: 0.85;
+  padding: 6px 10px 0 0;
+  color: var(--primary);
+}
+
+/* ---------- callouts ---------- */
+.callout {
+  margin: var(--s-5) 0;
+  padding: var(--s-4) var(--s-5);
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0 var(--s-3);
+  align-items: start;
+}
+.callout > .callout-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  padding: 3px 0;
+  white-space: nowrap;
+}
+.callout > .callout-body { font-size: 15.5px; line-height: 1.55; }
+.callout > .callout-body > :first-child { margin-top: 0; }
+.callout > .callout-body > :last-child  { margin-bottom: 0; }
+
+.callout[data-kind="goal"]      { background: var(--moss-soft); border-color: #B5C6BB; }
+.callout[data-kind="goal"]     .callout-label { color: var(--moss); }
+.callout[data-kind="non-goal"]  { background: var(--surface-2); }
+.callout[data-kind="non-goal"]  .callout-body { color: var(--ink-muted); }
+.callout[data-kind="question"]  { background: var(--ochre-soft); border-color: #E0C988; }
+.callout[data-kind="question"] .callout-label { color: var(--ochre); }
+.callout[data-kind="assumption"]{ background: var(--surface-1); }
+.callout[data-kind="risk"]      { background: #F4D9CF; border-color: #E0B19E; }
+.callout[data-kind="risk"]     .callout-label { color: var(--primary-hover); }
+.callout[data-kind="note"]      { background: var(--canvas); border-style: dashed; }
+.callout[data-kind="key"]       { background: var(--primary-soft); border-color: #E2B59C; }
+.callout[data-kind="key"] .callout-label { color: var(--primary-hover); }
+.callout[data-kind="caveat"]   { background: var(--surface-1); border-style: dashed; border-color: var(--border-strong); }
+.callout[data-kind="caveat"] .callout-label { color: var(--ink-muted); }
+.callout[data-kind="rationale"]{ background: var(--code-bg); border-color: var(--border); }
+.callout[data-kind="rationale"] .callout-label { color: var(--moss); }
+
+/* ---------- id-list: Goals / Non-goals / Invariants / Resolved questions ----------
+   Light "leaflet" layout: thin colored stripe + bottom divider, no per-item card. */
+.id-list {
+  list-style: none;
+  padding: 0;
+  margin: var(--s-5) 0;
+  display: grid;
+  gap: 0;
+}
+.id-list > li {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  gap: var(--s-3);
+  align-items: baseline;
+  padding: var(--s-3) 0 var(--s-3) var(--s-4);
+  background: transparent;
+  border: none;
+  border-left: 3px solid var(--border-strong);
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  font-size: 15.5px;
+  line-height: 1.55;
+  text-wrap: pretty;
+  margin: 0;
+}
+.id-list > li:last-child  { border-bottom: none; }
+.id-list > li > .id-tag {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ink-muted);
+  padding: 1px 6px;
+  border-radius: var(--r-sm);
+  background: transparent;
+  text-align: center;
+  align-self: start;
+  margin-top: 2px;
+  border: 1px solid var(--border-strong);
+}
+.id-list > li > .id-body > :first-child { margin-top: 0; }
+.id-list > li > .id-body > :last-child  { margin-bottom: 0; }
+
+.id-list[data-kind="goal"]      > li { border-left-color: var(--moss); }
+.id-list[data-kind="goal"]      > li > .id-tag { color: var(--moss); border-color: #B5C6BB; }
+.id-list[data-kind="non-goal"]  > li { border-left-color: var(--ink-faint); }
+.id-list[data-kind="non-goal"]  > li > .id-body { color: var(--ink-muted); }
+.id-list[data-kind="non-goal"]  > li > .id-tag { color: var(--ink-muted); }
+.id-list[data-kind="invariant"] > li { border-left-color: var(--primary); }
+.id-list[data-kind="invariant"] > li > .id-tag { color: var(--primary-hover); border-color: #E2B59C; }
+.id-list[data-kind="question"]  > li { border-left-color: var(--ochre); }
+.id-list[data-kind="question"]  > li > .id-tag { color: var(--ochre); border-color: #E0C988; }
+.id-list[data-kind="risk"]      > li { border-left-color: var(--primary); }
+.id-list[data-kind="risk"]      > li > .id-tag { color: var(--primary); border-color: var(--primary); }
+
+/* ---------- cross-reference (§ section refs, spec doc refs) ---------- */
+.xref {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  color: var(--moss);
+  background: var(--moss-soft);
+  padding: 1px 6px 1px 4px;
+  border-radius: var(--r-sm);
+  text-decoration: none;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.xref::before { content: "§"; margin-right: 2px; opacity: 0.7; }
+.xref.doc::before { content: "⧉"; }
+.xref:hover { border-color: var(--moss); background: var(--canvas); color: var(--moss); }
+.doc a.xref { text-decoration: none; }
+
+/* ---------- journey / scenario block ---------- */
+.journey {
+  margin: var(--s-5) 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--canvas);
+  overflow: hidden;
+}
+.journey-head {
+  padding: var(--s-3) var(--s-5);
+  background: transparent;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+}
+.journey-id {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  color: var(--primary);
+  background: transparent;
+  border: 1px solid var(--primary-soft);
+  padding: 2px 7px;
+  border-radius: var(--r-sm);
+}
+.journey-title {
+  font-family: var(--font-display) !important;
+  font-size: 20px;
+  line-height: 1.2;
+  margin: 0;
+  flex: 1;
+  font-weight: 400;
+  letter-spacing: -0.015em;
+}
+.journey-body { padding: var(--s-4) var(--s-5) var(--s-3); display: grid; gap: var(--s-4); }
+.journey-body > section { display: grid; gap: var(--s-2); }
+.journey-body > section > h4 {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  font-weight: 500;
+  margin: 0;
+}
+.journey-body ul, .journey-body ol {
+  margin: 0;
+  padding-left: var(--s-5);
+  font-size: 14.5px;
+  line-height: 1.55;
+}
+.journey-body ul li { margin-bottom: var(--s-1); }
+
+/* Steps: position-based, NOT grid (so inline <code> stays inline) */
+.journey-steps {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  counter-reset: step;
+}
+.journey-steps li {
+  position: relative;
+  counter-increment: step;
+  padding: var(--s-2) 0 var(--s-2) 32px;
+  border-bottom: 1px dashed var(--border);
+  margin: 0;
+  display: block;
+  font-size: 14.5px;
+  line-height: 1.55;
+}
+.journey-steps li:last-child { border-bottom: none; }
+.journey-steps li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: var(--s-2);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-faint);
+  background: var(--surface-1);
+  border-radius: 50%;
+  width: 20px; height: 20px;
+  display: grid; place-items: center;
+  border: 1px solid var(--border);
+}
+
+/* ---------- prompt stack (visual blocks in registration/composition order) ---------- */
+.prompt-stack {
+  list-style: none;
+  padding: 0;
+  margin: var(--s-5) 0;
+  display: grid;
+  gap: 4px;
+  font-family: var(--font-mono);
+}
+.prompt-stack > li {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: var(--s-3);
+  align-items: center;
+  background: var(--canvas);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--primary);
+  border-radius: var(--r-sm);
+  padding: var(--s-3) var(--s-4);
+  font-size: 13.5px;
+  margin: 0;
+}
+.prompt-stack > li > .stack-tag {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  color: var(--primary);
+  text-transform: uppercase;
+}
+.prompt-stack > li > .stack-tag::before { content: "<"; opacity: 0.5; }
+.prompt-stack > li > .stack-tag::after  { content: ">"; opacity: 0.5; }
+.prompt-stack > li > .stack-body { color: var(--ink); font-family: var(--font-body); font-size: 14px; line-height: 1.45; }
+.prompt-stack > li > .stack-body em { color: var(--ink-muted); font-style: italic; }
+.prompt-stack > li[data-state="deferred"] { opacity: 0.55; border-left-color: var(--ink-faint); border-left-style: dashed; }
+.prompt-stack > li[data-state="deferred"] > .stack-tag { color: var(--ink-faint); }
+.prompt-stack > li[data-state="first"]    { border-left-color: var(--ochre); }
+.prompt-stack > li[data-state="first"] > .stack-tag { color: var(--ochre); }
+
+/* margin annotation (small note alongside paragraphs on wide screens) */
+.margin-note {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 15px;
+  color: var(--ink-muted);
+  border-left: 1px solid var(--border-strong);
+  padding-left: var(--s-3);
+  margin: var(--s-3) 0;
+}
+@media (min-width: 1400px) {
+  .margin-note {
+    float: right;
+    clear: right;
+    width: 200px;
+    margin: 0 calc(-220px) var(--s-3) var(--s-4);
+    border-left: none;
+    padding-left: 0;
+    border-top: 1px solid var(--border-strong);
+    padding-top: var(--s-2);
+  }
+}
+
+/* ---------- tables ---------- */
+.doc table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: var(--s-5) 0;
+  font-size: 14.5px;
+}
+.doc thead th {
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  padding: var(--s-2) var(--s-3);
+  border-bottom: 1px solid var(--border-strong);
+  background: transparent;
+}
+.doc tbody td {
+  padding: var(--s-3);
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.doc tbody tr:hover td { background: rgba(214, 207, 190, 0.18); }
+.doc table.compact tbody td { padding: var(--s-2) var(--s-3); }
+
+/* risks table */
+.risks td.severity[data-sev="low"]    { color: var(--moss); font-weight: 500; }
+.risks td.severity[data-sev="med"]    { color: var(--ochre); font-weight: 500; }
+.risks td.severity[data-sev="high"]   { color: var(--primary); font-weight: 600; }
+
+/* ---------- decision log ---------- */
+.decision {
+  margin: var(--s-5) 0;
+  padding: var(--s-5);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--canvas);
+  position: relative;
+}
+.decision-head {
+  display: flex; align-items: baseline;
+  gap: var(--s-3);
+  margin-bottom: var(--s-3);
+  flex-wrap: wrap;
+}
+.decision-id {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-faint);
+  letter-spacing: 0.05em;
+}
+.decision-title {
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 1.15;
+  margin: 0;
+  flex: 1;
+}
+.decision-meta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--s-2) var(--s-4);
+  font-size: 13.5px;
+  margin-top: var(--s-3);
+  padding-top: var(--s-3);
+  border-top: 1px dashed var(--border);
+}
+.decision-meta dt {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.decision-meta dd { margin: 0; }
+
+/* ---------- task list ---------- */
+.tasks {
+  list-style: none;
+  padding: 0;
+  margin: var(--s-5) 0;
+  border-top: 1px solid var(--border);
+}
+.tasks li {
+  display: grid;
+  grid-template-columns: 24px 1fr auto auto;
+  gap: var(--s-3);
+  align-items: center;
+  padding: var(--s-3) 0;
+  border-bottom: 1px solid var(--border);
+  margin: 0;
+  font-size: 15px;
+}
+.tasks .task-check {
+  width: 18px; height: 18px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  background: var(--canvas);
+  cursor: pointer;
+  display: grid; place-items: center;
+  transition: background 120ms, border-color 120ms;
+}
+.tasks .task-check:hover { border-color: var(--ink-muted); }
+.tasks .task-check::after {
+  content: ""; width: 10px; height: 10px;
+  border-radius: 2px;
+  background: var(--primary);
+  transform: scale(0);
+  transition: transform 120ms;
+}
+.tasks li[data-status="done"] .task-check { border-color: var(--primary); }
+.tasks li[data-status="done"] .task-check::after { transform: scale(1); }
+.tasks li[data-status="done"] .task-text { color: var(--ink-muted); text-decoration: line-through; text-decoration-color: var(--border-strong); }
+.tasks li[data-status="doing"] .task-check { border-color: var(--ochre); }
+.tasks li[data-status="doing"] .task-check::after { background: var(--ochre); transform: scale(1); border-radius: 50%; }
+.tasks li[data-status="blocked"] .task-check { border-color: #B83A1E; background: #F4D9CF; }
+.tasks li[data-status="blocked"] .task-check::after { content: "✕"; width: auto; height: auto; background: none; color: #B83A1E; font-size: 12px; transform: scale(1); }
+.tasks .task-owner {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--ink-muted);
+}
+.tasks .task-est {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--ink-faint);
+  background: var(--surface-1);
+  padding: 1px 8px;
+  border-radius: var(--r-pill);
+}
+
+/* ---------- changeset / file tree ---------- */
+.changeset {
+  margin: var(--s-5) 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--canvas);
+  overflow: hidden;
+}
+.changeset-head {
+  display: flex; align-items: center;
+  padding: var(--s-2) var(--s-4);
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+.changeset-head .counts { margin-left: auto; display: flex; gap: var(--s-3); }
+.changeset-head .counts .add  { color: var(--moss); }
+.changeset-head .counts .mod  { color: var(--ochre); }
+.changeset-head .counts .del  { color: var(--primary); }
+.changeset ul.tree {
+  list-style: none;
+  padding: var(--s-3) var(--s-4);
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+.changeset ul.tree li {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 2px 0;
+  margin: 0;
+}
+.changeset ul.tree li .op {
+  width: 14px;
+  text-align: center;
+  font-weight: 600;
+}
+.changeset ul.tree li[data-op="add"] .op { color: var(--moss); }
+.changeset ul.tree li[data-op="mod"] .op { color: var(--ochre); }
+.changeset ul.tree li[data-op="del"] .op { color: var(--primary); }
+.changeset ul.tree li[data-op="del"] .path { text-decoration: line-through; color: var(--ink-muted); }
+.changeset ul.tree li .note { color: var(--ink-faint); font-size: 12px; margin-left: var(--s-2); }
+
+/* ---------- code ---------- */
+.code-block {
+  margin: var(--s-5) 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--code-bg);
+  overflow: hidden;
+}
+.code-block.compact { background: var(--code-bg); }
+.code-block.compact > .code-head { display: none; }
+.code-head {
+  display: flex; align-items: center;
+  padding: var(--s-2) var(--s-4);
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+.code-head .filename { color: var(--ink); }
+.code-head .lang { margin-left: var(--s-3); color: var(--ink-faint); }
+.code-head .copy { margin-left: auto; }
+.code-block pre {
+  margin: 0;
+  padding: var(--s-4);
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink);
+}
+.code-block pre code { font-family: inherit; }
+:not(pre) > code {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  background: var(--code-bg);
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: none;
+  color: var(--ink);
+}
+
+/* Prism theme overrides */
+.token.comment, .token.prolog, .token.doctype, .token.cdata { color: var(--ink-faint); font-style: italic; }
+.token.punctuation { color: var(--ink-muted); }
+.token.property, .token.tag, .token.boolean, .token.number, .token.constant, .token.symbol { color: var(--primary); }
+.token.selector, .token.attr-name, .token.string, .token.char, .token.builtin { color: var(--moss); }
+.token.operator, .token.entity, .token.url, .language-css .token.string, .style .token.string { color: var(--ochre); }
+.token.atrule, .token.attr-value, .token.keyword { color: var(--primary-hover); font-weight: 500; }
+.token.function, .token.class-name { color: var(--primary-hover); }
+.token.regex, .token.important, .token.variable { color: var(--ochre); }
+
+/* ---------- diff blocks ---------- */
+.diff {
+  margin: var(--s-5) 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+.diff > summary {
+  padding: var(--s-2) var(--s-4);
+  background: var(--surface-1);
+  cursor: pointer;
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+.diff > .diff-body { background: var(--code-bg); padding: var(--s-3) 0; }
+.diff .line { padding: 1px var(--s-4); white-space: pre; }
+.diff .line.add { background: rgba(61, 90, 76, 0.12); color: var(--moss); }
+.diff .line.add::before  { content: "+ "; opacity: 0.6; }
+.diff .line.del { background: rgba(184, 70, 43, 0.12); color: var(--primary); }
+.diff .line.del::before  { content: "− "; opacity: 0.6; }
+.diff .line.ctx { color: var(--ink-muted); }
+.diff .line.ctx::before  { content: "  "; }
+
+/* ---------- diagrams ---------- */
+.diagram {
+  margin: var(--s-6) 0;
+  padding: var(--s-5);
+  background: var(--canvas);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow-x: auto;
+  display: grid;
+  place-items: center;
+}
+.diagram .caption,
+.figure-caption {
+  display: block;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 14px;
+  color: var(--ink-muted);
+  margin-top: var(--s-3);
+  text-align: center;
+}
+.figure {
+  margin: var(--s-6) 0;
+}
+.figure > * { display: block; margin: 0 auto; }
+
+/* mermaid surface */
+.mermaid {
+  font-family: var(--font-body) !important;
+}
+
+/* ASCII / monospace box diagrams */
+pre.ascii {
+  background: var(--canvas);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--s-4) var(--s-5);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--ink);
+  overflow-x: auto;
+}
+
+/* svg helper class: for hand-authored inline SVG illustrations */
+svg.illus {
+  --stroke: var(--ink);
+  --fill:   var(--canvas);
+  --accent: var(--primary);
+  --muted:  var(--ink-muted);
+  max-width: 100%;
+  height: auto;
+}
+svg.illus .stroke   { stroke: var(--stroke); fill: none; stroke-width: 1.25; }
+svg.illus .stroke-2 { stroke: var(--stroke); fill: none; stroke-width: 2; }
+svg.illus .fill     { fill: var(--fill); stroke: var(--stroke); stroke-width: 1.25; }
+svg.illus .accent   { stroke: var(--accent); fill: none; stroke-width: 2; }
+svg.illus .accent-f { fill: var(--accent); stroke: none; }
+svg.illus .muted    { stroke: var(--muted); fill: none; stroke-width: 1; stroke-dasharray: 3 3; }
+svg.illus text      { font-family: var(--font-mono); font-size: 11px; fill: var(--ink); }
+svg.illus text.label{ font-family: var(--font-display); font-style: italic; font-size: 14px; fill: var(--ink); }
+
+/* spark: tiny inline charts */
+.spark { display: inline-block; vertical-align: middle; height: 18px; }
+.spark path { fill: none; stroke: var(--primary); stroke-width: 1.5; }
+
+/* ---------- swimlane / phases ---------- */
+.phases {
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 5), 1fr);
+  gap: var(--s-3);
+  margin: var(--s-5) 0;
+}
+.phase {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--s-3) var(--s-4);
+  background: var(--canvas);
+  position: relative;
+}
+.phase .phase-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin-bottom: var(--s-2);
+}
+.phase .phase-title {
+  font-family: var(--font-display);
+  font-size: 18px;
+  line-height: 1.15;
+  margin: 0 0 var(--s-2);
+}
+.phase ul { padding-left: var(--s-4); margin: var(--s-2) 0 0; font-size: 13.5px; }
+.phase[data-state="done"]    { background: var(--moss-soft); }
+.phase[data-state="active"]  { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary) inset; }
+.phase[data-state="future"]  { opacity: 0.7; }
+
+/* ---------- matrix (2x2) ---------- */
+.matrix {
+  display: grid;
+  grid-template-columns: 100px 1fr 1fr;
+  grid-template-rows: 40px 1fr 1fr;
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  margin: var(--s-5) 0;
+  min-height: 320px;
+}
+.matrix > * { background: var(--canvas); padding: var(--s-3); }
+.matrix .axis-y, .matrix .axis-x {
+  display: grid; place-items: center;
+  font-family: var(--font-mono); font-size: 11px;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--ink-muted);
+  background: var(--surface-1);
+}
+.matrix .cell {
+  font-size: 13.5px;
+  display: flex; flex-direction: column; gap: var(--s-2);
+  position: relative;
+}
+.matrix .cell .cell-label {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--ink-faint);
+}
+
+/* ---------- right rail TOC ---------- */
+.rail {
+  position: sticky;
+  top: var(--s-5);
+  align-self: start;
+  font-size: 13px;
+  max-height: calc(100vh - var(--s-7));
+  overflow-y: auto;
+  padding-left: var(--s-4);
+  border-left: 1px solid var(--border);
+}
+.rail h5 {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 0 0 var(--s-3);
+}
+.rail ol {
+  list-style: none;
+  padding: 0; margin: 0;
+  counter-reset: toc;
+}
+.rail ol li {
+  counter-increment: toc;
+  margin-bottom: var(--s-2);
+  line-height: 1.35;
+}
+.rail ol li a {
+  color: var(--ink-muted);
+  text-decoration: none;
+  display: flex;
+  gap: var(--s-2);
+  padding: 2px 6px 2px 0;
+  border-radius: 3px;
+}
+.rail ol li a::before {
+  content: counter(toc, decimal-leading-zero);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-faint);
+  padding-top: 2px;
+  flex-shrink: 0;
+}
+.rail ol li a:hover { color: var(--ink); }
+.rail ol li a.active { color: var(--primary); font-weight: 500; }
+
+.rail ol .rail-sub {
+  list-style: none;
+  counter-reset: none;
+  padding-left: var(--s-5);
+  margin: var(--s-1) 0 var(--s-2);
+  border-left: 1px solid var(--border);
+}
+.rail ol .rail-sub li {
+  counter-increment: none;
+  margin-bottom: 2px;
+}
+.rail ol .rail-sub li a::before { content: ""; padding: 0; }
+.rail ol .rail-sub li a {
+  font-size: 12px;
+  color: var(--ink-faint);
+  padding: 1px 6px 1px 0;
+}
+
+.rail .rail-progress {
+  margin: var(--s-5) 0 var(--s-3);
+  height: 2px; background: var(--border);
+  border-radius: 2px; overflow: hidden;
+}
+.rail .rail-progress div { height: 100%; background: var(--primary); width: 0%; transition: width 120ms; }
+
+/* ---------- editable affordances ---------- */
+[contenteditable="true"] {
+  outline: none;
+  border-radius: 3px;
+  transition: background 80ms, box-shadow 80ms;
+}
+[contenteditable="true"]:hover {
+  background: rgba(184, 70, 43, 0.04);
+}
+[contenteditable="true"]:focus {
+  background: rgba(184, 70, 43, 0.06);
+  box-shadow: 0 0 0 2px rgba(184, 70, 43, 0.18);
+}
+body.edit-off [contenteditable="true"] {
+  cursor: default;
+  background: none !important;
+  box-shadow: none !important;
+}
+body.edit-off [data-edit-only] { display: none !important; }
+
+/* edit chips next to status / task elements */
+.status[data-editable], .tasks li[data-editable] .task-check {
+  cursor: pointer;
+}
+
+/* ---------- collapsible sections ---------- */
+.doc section.collapsible > h2 { cursor: pointer; }
+.doc section.collapsible > h2::after {
+  content: "▾";
+  margin-left: auto;
+  color: var(--ink-faint);
+  font-size: 14px;
+  transition: transform 120ms;
+}
+.doc section.collapsible.collapsed > *:not(h2) { display: none; }
+.doc section.collapsible.collapsed > h2::after { transform: rotate(-90deg); }
+
+/* ---------- footer ---------- */
+.doc-footer {
+  margin-top: var(--s-9);
+  padding-top: var(--s-5);
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--ink-faint);
+  display: flex;
+  gap: var(--s-5);
+  flex-wrap: wrap;
+}
+
+/* ---------- toasts ---------- */
+.toast-host {
+  position: fixed; bottom: var(--s-5); right: var(--s-5);
+  display: flex; flex-direction: column; gap: var(--s-2);
+  z-index: 10000;
+  pointer-events: none;
+}
+.toast {
+  background: var(--ink);
+  color: var(--canvas);
+  padding: 8px 14px;
+  border-radius: var(--r-md);
+  font-size: 13px;
+  box-shadow: var(--shadow-elevated);
+  animation: toastIn 240ms cubic-bezier(.2,.7,.2,1);
+}
+@keyframes toastIn {
+  from { transform: translateY(8px); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+
+/* ---------- focus, accessibility, motion ---------- */
+:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ---------- print ---------- */
+@media print {
+  body { background: white; font-size: 11pt; }
+  .topbar, .rail, .toast-host, .btn, [data-edit-only] { display: none !important; }
+  .page { display: block; padding: 0; }
+  .doc { max-width: 6.5in; margin: 0 auto; }
+  .doc h2 { page-break-after: avoid; border-top-color: #ddd; }
+  .doc h2::before { color: #999; }
+  .callout, .decision, .diagram, .code-block, .changeset {
+    page-break-inside: avoid;
+    box-shadow: none !important;
+    border-color: #ccc !important;
+  }
+  a { color: var(--primary) !important; text-decoration: none; }
+  a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-family: var(--font-mono);
+    font-size: 9pt;
+    color: #666;
+  }
+  .doc-title { font-size: 28pt; }
+}
+
+</style>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism.min.css" disabled>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+</head>
+<body>
+
+<div class="page">
+
+  <!-- ============================================================
+       TOP BAR: breadcrumb + actions. Keep as-is.
+       ============================================================ -->
+  <header class="topbar">
+    <div class="crumbs">
+      <a href="index.html">plans</a>
+      <span class="sep">/</span>
+      <span data-crumb-area>portfolio</span>
+      <span class="sep">/</span>
+      <span data-crumb-slug>python-llm-app-progression</span>
+    </div>
+    <div class="spacer"></div>
+    <div class="btn-row">
+      <button class="btn ghost"   data-action="toggle-edit">Edit · on</button>
+      <button class="btn ghost"   data-action="print">Print</button>
+      <div class="btn-menu-wrap" data-menu>
+        <button class="btn ghost" data-menu-toggle>Copy</button>
+        <div class="btn-menu">
+          <button type="button" data-action="copy-diff">
+            <span class="menu-label">Copy diff</span>
+            <span class="menu-hint">working iteration · paste back to claude code</span>
+          </button>
+          <button type="button" data-action="copy-md">
+            <span class="menu-label">Copy markdown</span>
+            <span class="menu-hint">finalize · yaml frontmatter + body</span>
+          </button>
+        </div>
+      </div>
+      <button class="btn"         data-action="export-html">Download</button>
+      <button class="btn ghost"   data-action="reset-edits" title="Discard browser edits">Reset</button>
+    </div>
+  </header>
+
+  <article class="doc">
+
+    <header class="doc-header">
+      <div class="doc-eyebrow">
+        <span class="dot"></span>
+        <span>Portfolio · vision &amp; architecture</span>
+        <span class="status" data-status="draft" data-editable></span>
+      </div>
+      <h1 class="doc-title"><em>Understanding</em> how Python LLM apps grow into agents</h1>
+      <p class="doc-summary">A 10-level public GitHub progression that builds one growing personal LLM assistant, hand-rolled on OpenAI and FastAPI. Conversation is the substrate. The Obsidian vault is the memory store. Tools are added when the assistant earns them.</p>
+      <dl class="doc-meta">
+        <div><dt>Author</dt>      <dd>Scott Clark</dd></div>
+        <div><dt>Status</dt>      <dd>draft · in planning</dd></div>
+        <div><dt>Started</dt>     <dd>2026-05-21</dd></div>
+        <div><dt>Target</dt>      <dd>rolling · one level at a time</dd></div>
+        <div><dt>Tags</dt>        <dd class="tags"><span class="tag">portfolio</span><span class="tag">python</span><span class="tag">llm</span><span class="tag">assistant</span><span class="tag">agents</span><span class="tag">memory</span><span class="tag">skills</span></dd></div>
+      </dl>
+    </header>
+
+    <section>
+      <h2>Intent</h2>
+
+      <div class="callout" data-kind="goal">
+        <span class="callout-label">Goal</span>
+        <div class="callout-body"><p>Build a public, ten-project portfolio that demonstrates a coherent progression from a daily-use chat assistant to a self-improving agent. Each level teaches new concepts, every project is useful to a human (starting with the author), and every project builds on the prior one. The throughline is one growing personal assistant, not ten unrelated apps.</p></div>
+      </div>
+
+      <div class="callout" data-kind="non-goal">
+        <span class="callout-label">Non-goals</span>
+        <div class="callout-body">
+          <ul>
+            <li>Enterprise-scale production: &ldquo;production&rdquo; here means publishable, polished, and useful, not SLA-grade.</li>
+            <li>Recreating the analog repos we studied: we learn from them and write our own.</li>
+            <li>Multi-provider portability: OpenAI only for dev to keep costs and noise down.</li>
+            <li>Framework adoption: no LangChain, CrewAI, or OpenAI Agents SDK. Hand-rolled on the raw OpenAI SDK is the point.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="callout" data-kind="key">
+        <span class="callout-label">Key insight</span>
+        <div class="callout-body"><p>The hardest constraint is no SME for evals. That makes <a class="xref" href="#eval">Eval strategy</a> the spine of every level, not an afterthought. <a class="xref" href="#l5">L5 is the explicit pivot</a>. We build the eval muscle on simple apps before agents make it hard.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <h2 id="goals">Goals</h2>
+      <ol class="id-list" data-kind="goal">
+        <li id="G1"><span class="id-tag">G1</span><div class="id-body">Each level introduces exactly one new technical concept, feature, or agent paradigm the author can articulate and defend in an interview.</div></li>
+        <li id="G2"><span class="id-tag">G2</span><div class="id-body">Each level produces a working app a human would actually use: not a notebook, not a demo.</div></li>
+        <li id="G3"><span class="id-tag">G3</span><div class="id-body">Each level publishes as a standalone GitHub repo with locked deps, README, CI smoke test, and a logged-LLM-calls store (see <a href="#I5">I5</a>: every call, tool invocation, and cost traced to a local SQLite or JSONL store for annotation, failure analysis, and evals).</div></li>
+        <li id="G4"><span class="id-tag">G4</span><div class="id-body">Every level uses the same OpenAI + FastAPI + Python stack and a hand-rolled agent harness.</div></li>
+        <li id="G5"><span class="id-tag">G5</span><div class="id-body">Every level contributes to one growing personal assistant. The Obsidian vault is the memory substrate; tools are added when they earn their place; no level is a standalone data pipeline.</div></li>
+        <li id="G6"><span class="id-tag">G6</span><div class="id-body">Each level is annotate-able, supports failure analysis, and is evaluable without a domain expert (the workflow Hamel Husain documents at <a href="https://hamel.dev">hamel.dev</a>): tasks have verifiable ground truth, judged-by-rubric outputs, or trajectory evals.</div></li>
+      </ol>
+    </section>
+
+    <section>
+      <h2>Non-goals</h2>
+      <ol class="id-list" data-kind="non-goal">
+        <li id="NG1"><span class="id-tag">NG1</span><div class="id-body">Multi-model / multi-provider <em>production</em> support. OpenAI is the only build-phase provider. We do keep a thin provider-abstraction seam (see ADR-006) so future expansion is cheap, but we do not implement a second provider in this curriculum. <code>litellm</code> may enter at L5 if eval comparisons need cross-provider judges.</div></li>
+        <li id="NG2"><span class="id-tag">NG2</span><div class="id-body">Framework cargo-culting: LangChain, CrewAI, LlamaIndex, OpenAI Agents SDK. We learn from them, we don&rsquo;t use them. <em>(Pydantic-AI and Letta are not in this list; see <a href="#I7">I7</a> for why we reserve the right to revert.)</em></div></li>
+        <li id="NG3"><span class="id-tag">NG3</span><div class="id-body">A unified frontend across all levels. CLI / TUI / web is per-level; the Obsidian plugin is the north star, not a deliverable per level.</div></li>
+        <li id="NG4"><span class="id-tag">NG4</span><div class="id-body">Polishing already-shipped levels when a new level lands. Each repo is &ldquo;done at the time of its commit&rdquo;: we add to the portfolio, we don&rsquo;t maintain ten things.</div></li>
+      </ol>
+    </section>
+
+    <section>
+      <h2 id="invariants">Invariants</h2>
+      <ol class="id-list" data-kind="invariant">
+        <li id="I1"><span class="id-tag">I1</span><div class="id-body">Every project has an LLM loop with more than one call: even L1 retries on validation failure.</div></li>
+        <li id="I2"><span class="id-tag">I2</span><div class="id-body">Every project has some form of memory. The kind varies (in-context, always-loaded AGENTS.md-style, semantic, agent-owned, episodic, procedural) and is the central learning artifact of that level.</div></li>
+        <li id="I3"><span class="id-tag">I3</span><div class="id-body">Every project has a FastAPI backend. The frontend is whatever fits (CLI, TUI, or web). The API stays consistent so any future surface (Obsidian plugin, mobile app, hosted web UI) plugs into the same backend.</div></li>
+        <li id="I4"><span class="id-tag">I4</span><div class="id-body">Every project ships with an eval suite proportional to its complexity. L1 needs &lsquo;X&rsquo; labeled examples; L10 needs a closed-loop self-evaluator.</div></li>
+        <li id="I5"><span class="id-tag">I5</span><div class="id-body"><strong>Trace.</strong> All LLM calls, tool invocations, and costs are logged to a local SQLite or JSONL store. This is the source for annotations, failure analysis, and evals. Non-negotiable from L1.</div></li>
+        <li id="I6"><span class="id-tag">I6</span><div class="id-body">Every markdown file our agents write to the vault that contains agent-readable instructions is <a class="xref" href="#patterns">Skills-spec compliant</a>. <em>(Open question: verify the Skills-spec frontmatter is also Obsidian-compatible so the same file renders cleanly in the vault.)</em></div></li>
+        <li id="I7"><span class="id-tag">I7</span><div class="id-body">Goal is no agent framework imports outside <code>openai</code>. Tool schemas, the loop, retries, and memory are written by us, in our repo. <em>(We may revert to Pydantic-AI or Letta at some point, and we are likely to take detours to explore how the frameworks would make our lives easier. The default stance is hand-rolled; the detours are deliberate exceptions, not drift.)</em></div></li>
+        <li id="I8"><span class="id-tag">I8</span><div class="id-body">Writes to external systems (Bluesky posts/replies/likes/follows, future tool integrations) are scoped to bot or sandbox accounts owned by the author. Reads can be global, subject to platform terms and rate limits. Larger public-figure accounts that opt into bot interaction can be allowlisted; default-deny on writes otherwise. Protects against accidental notification spam to non-consenting users and keeps the portfolio defensible.</div></li>
+        <li id="I9"><span class="id-tag">I9</span><div class="id-body">App code never imports a provider SDK directly. Chat, streaming, and structured-output calls route through pydantic-ai&rsquo;s <code>Agent</code> / <code>Model</code> interface (per ADR-006). Embeddings route through the indexer&rsquo;s provider-agnostic interface (e.g., <code>chromadb</code>&rsquo;s embedding functions). Provider swap is a model-string change in config, not a code change.</div></li>
+        <li id="I10"><span class="id-tag">I10</span><div class="id-body">Every API call identifies its calling principal (human user or agent). Conversations, semantic-recall corpora, user-fact memories, and traces are partitioned per principal; skills and shared project knowledge are global. Multi-principal from L1: designed in, not retrofitted. See ADR-007.</div></li>
+      </ol>
+    </section>
+
+    <section>
+      <h2 id="context">Context</h2>
+      <p class="lede">The 2026 agent landscape is crowded with frameworks but thin on production references. The production references that do exist mostly wrote their own harness.</p>
+
+      <p>The most-studied agent frameworks in Python (LangChain/LangGraph, CrewAI, AutoGen/AG2, smolagents, Agno, DSPy, Strands, Atomic Agents, Haystack, Letta, Pydantic-AI, OpenAI Agents SDK, Claude Agent SDK) share one structural property: their public production rosters thin out fast under verification. LangChain/LangGraph has the deepest (Klarna, Replit, LinkedIn, Elastic). Pydantic-AI has a handful (MindsDB, Sophos, Boosted.ai) but mostly from the vendor&rsquo;s own case-study page. Letta has Bilt and a few others. The two new agent SDKs (OpenAI Agents, Claude Agent) have <em>no</em> verified third-party shipped products yet. Both are under fourteen months old as public libraries.</p>
+
+      <p>Meanwhile, the most respected shipped agentic products (<strong>Claude Code, Cursor, Cognition&rsquo;s Devin, Cline, Continue, Aider, OpenHands</strong>) are built on the raw provider SDKs with hand-rolled harnesses. Anthropic, Cursor, and Cognition have all published essays explaining the rationale: control over context, debuggability, model-specific tool formats, and (Anthropic&rsquo;s point) the desire to <em>delete</em> code when new models land.</p>
+
+      <div class="callout" data-kind="rationale">
+        <span class="callout-label">Why this matters for the portfolio</span>
+        <div class="callout-body"><p>If the most credible shipped products avoid frameworks, the hand-rolled approach is itself the marketable skill. The portfolio&rsquo;s narrative is not &ldquo;I can use Pydantic-AI&rdquo;: it&rsquo;s &ldquo;I built a small Claude Code on my own laptop and I understand every line.&rdquo;</p></div>
+      </div>
+
+      <div class="callout" data-kind="assumption">
+        <span class="callout-label">Assumptions</span>
+        <div class="callout-body">
+          <ul>
+            <li>OpenAI&rsquo;s pricing on small and medium models stays cheap enough that an author can run hundreds of eval runs per level without budget pressure.</li>
+            <li>Markdown with YAML frontmatter and wikilink-style cross-references remains a viable substrate for agent-readable memory through the portfolio&rsquo;s build window. The vault is just a folder of files; if Obsidian itself shifts, the underlying format is portable.</li>
+            <li>The <a href="https://agentskills.io/specification">agentskills.io</a> spec stays the cross-vendor convergence point for agent skill files.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2 id="design">Design</h2>
+      <p class="lede">Three macro-phases. The personal-assistant substrate, the eval pivot, then tools and agents.</p>
+
+      <figure class="diagram">
+        <pre class="mermaid">
+flowchart LR
+  L1[L1 Chat + transcripts] --> L2[L2 Semantic recall]
+  L2 --> L3[L3 Declarative memory]
+  L3 --> L4[L4 Skills]
+  L4 --> L5{{L5 Eval harness}}
+  L5 --> L6[L6 First tool, ReAct]
+  L6 --> L7[L7 Multi-tool agent]
+  L7 --> L8[L8 Agent-written skills]
+  L8 --> L9[L9 Planner + worker]
+  L9 --> L10[L10 Self-improving]
+  L5 -.evaluates.-> L1
+  L5 -.evaluates.-> L2
+  L5 -.evaluates.-> L3
+  L5 -.evaluates.-> L4
+        </pre>
+        <figcaption class="figure-caption">Figure 1. Ten levels. L1–L4 build the personal-assistant substrate (chat, recall, memory, skills). L5 is the eval pivot, retroactively grading L1–L4 and supplying the trace store every later level depends on. L6–L10 are tools and agents grown on top of that substrate.</figcaption>
+      </figure>
+    </section>
+
+    <section>
+      <h2>Phases</h2>
+      <div class="phases" style="--cols: 3;">
+        <div class="phase" data-state="active">
+          <div class="phase-label">Macro-phase 1</div>
+          <h4 class="phase-title">Assistant substrate (L1–L4)</h4>
+          <ul>
+            <li>Chat, semantic recall, declarative memory, procedural skills</li>
+            <li>Conversation-first; vault as the memory store</li>
+            <li>Each level is useful daily before the next ships</li>
+          </ul>
+        </div>
+        <div class="phase" data-state="future">
+          <div class="phase-label">Macro-phase 2</div>
+          <h4 class="phase-title">Eval pivot (L5)</h4>
+          <ul>
+            <li>Small hand-built eval harness</li>
+            <li>Retroactively evaluates L1–L4</li>
+            <li>Substrate for L6–L10</li>
+          </ul>
+        </div>
+        <div class="phase" data-state="future">
+          <div class="phase-label">Macro-phase 3</div>
+          <h4 class="phase-title">Tools and agents (L6–L10)</h4>
+          <ul>
+            <li>Hand-rolled ReAct on the raw SDK</li>
+            <li>Tools added when the assistant earns them</li>
+            <li>Agent-written skills, long-horizon work, self-improvement</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2 id="levels">Levels</h2>
+      <p>One subsection per level. Each names the new concept, the primary analog we studied, the imports we&rsquo;ll write against, and the eval approach. L1&ndash;L4 build the assistant&rsquo;s conversational substrate; L5 is the eval pivot; L6&ndash;L10 add tools and agentic behaviors on top.</p>
+
+      <h3 id="l1">L1 · Chat with persistent transcript</h3>
+      <p><strong>Concept.</strong> Streaming responses, multi-turn state, SQLite-backed session history. Each session is also written back to the vault as a session note. Multi-call (<a class="xref" href="#I1">I1</a>) is satisfied because the assistant retrieves a small slice of prior-session context (recency + keyword) before answering. Every session is tagged with a principal (<a class="xref" href="#I10">I10</a>): the local CLI defaults to the OS user; HTTP clients (Claude Code, future agents) pass an API key that resolves to their principal ID.</p>
+      <p><strong>Use case.</strong> A CLI chat you use daily. Conversations are searchable, persist across sessions, and accumulate as the assistant&rsquo;s long-term ground truth about how each principal (you, Claude Code) talks to it.</p>
+      <p><strong>Primary analog.</strong> <a href="https://github.com/Azure-Samples/rag-postgres-openai-python">Azure-Samples/rag-postgres-openai-python</a> (490 stars) for FastAPI + streaming + persistence. Secondary: <a href="https://github.com/basicmachines-co/basic-memory">basicmachines-co/basic-memory</a> (3k stars) for industrial-grade conversation-plus-notes persistence; <a href="https://github.com/simonw/llm">simonw/llm</a> (12k stars) for the CLI shape.</p>
+      <p><strong>Imports.</strong> <code>pydantic_ai.Agent</code> (per ADR-006), <code>fastapi.responses.StreamingResponse</code>, <code>sqlmodel</code>, <code>uuid</code>, <code>pydantic-settings</code>, <code>typer</code>.</p>
+      <p><strong>Eval.</strong> Stream-cancel correctness (deterministic). Persistence round-trip (deterministic). Latency and tokens-per-second baseline. Multi-turn coherence (judge).</p>
+
+      <h3 id="l2">L2 · Semantic recall over your conversations</h3>
+      <p><strong>Concept.</strong> Embeddings, chunking strategy, hybrid retrieval (vector + BM25), applied to your accumulated chat history. Before generating, the assistant retrieves the most relevant past exchanges and injects them as context. The corpus is <em>you talking to it</em>, not an external dataset.</p>
+      <p><strong>Use case.</strong> &ldquo;We talked about X last week, where did we land?&rdquo; answered without scrolling. The assistant brings forward the relevant past on its own.</p>
+      <p><strong>Primary analog.</strong> <a href="https://github.com/benmaster82/Kwipu">benmaster82/Kwipu</a> (Python, 80 stars) for the hybrid-retrieval shape. <a href="https://github.com/basicmachines-co/basic-memory">basic-memory</a> for the conversation-corpus shape. <a href="https://github.com/Vasallo94/ObsidianRAG">Vasallo94/ObsidianRAG</a> (79 stars) for the indexer-reads-the-vault pattern.</p>
+      <p><strong>Imports.</strong> <code>chromadb</code> (or <code>sqlite-vec</code>), <code>rank_bm25.BM25Okapi</code>, <code>tiktoken</code>, <code>watchdog</code> (re-index on vault change).</p>
+      <p><strong>Eval.</strong> Retrieval metrics (recall@k, MRR) on bootstrapped (query → expected past-exchange) pairs sampled from your own chat history. Faithfulness when the retrieved context is summarized into the response.</p>
+
+      <h3 id="l3">L3 · Declarative memory</h3>
+      <p><strong>Concept.</strong> Distinct from session history: facts about <em>each principal</em> (preferences, ongoing projects, opinions, recurring entities) distilled and stored as always-loaded markdown. Memory is principal-scoped per <a class="xref" href="#I10">I10</a>: facts about Scott live in his memory folder, facts about Claude Code (its quirks, prior delegations, observed failure modes) live in its own. Shared project knowledge sits in a global namespace. Read on session start. Updated by the assistant when new facts emerge or old ones contradict.</p>
+      <p><strong>Use case.</strong> The assistant knows you between sessions (&ldquo;Scott is working on the portfolio plan, defaults to <code>uv</code>, dislikes em-dashes&rdquo;) without you re-saying it every time. When Claude Code calls the assistant, it can recall what it knows about Claude Code as a separate principal.</p>
+      <p><strong>Primary analog.</strong> <a href="https://github.com/cline/cline">cline/cline</a> (61k stars) Memory Bank pattern (<code>.clinerules/</code> as always-loaded procedural memory). Anthropic&rsquo;s own <code>AGENTS.md</code> / <code>CLAUDE.md</code> convention as the canonical shape. <a href="https://github.com/Ar9av/obsidian-wiki">Ar9av/obsidian-wiki</a> (1.4k stars) for vault conventions (manifest, <code>hot.md</code>, staging, provenance markers).</p>
+      <p><strong>Imports.</strong> <code>yaml</code>, <code>frontmatter</code>, the <a class="xref" href="#vault-primitives">vault-write primitives</a> from L1.</p>
+      <p><strong>Eval.</strong> Multi-session probe: facts planted in session N must surface in session N+1. Memory-decay correctness: stale facts dropped when contradicted, with a citation to the contradicting exchange.</p>
+
+      <h3 id="l4">L4 · Skills</h3>
+      <p><strong>Concept.</strong> Procedural memory. <code>SKILL.md</code> files in the vault that describe how to do recurring tasks. Loaded on match per the <a class="xref" href="#patterns">Skills-spec progressive disclosure</a> model. The assistant has <em>opinions</em> about how to do common things, and reaches for those opinions when the request matches.</p>
+      <p><strong>Use case.</strong> You ask for a PR review or a project scaffold; the assistant pulls the matching skill, follows its playbook, and asks the right clarifying questions instead of re-deriving the process every time.</p>
+      <p><strong>Primary analog.</strong> <a href="https://github.com/kepano/obsidian-skills">kepano/obsidian-skills</a> (32k stars): Obsidian CEO&rsquo;s official skill bundle, our format target. Anthropic Agent Skills as the canonical schema. <a href="https://github.com/cline/cline">cline/cline</a> Memory Bank for the procedural-memory shape.</p>
+      <p><strong>Imports.</strong> <code>yaml</code>, the <code>SKILL.md</code> loader (hand-written), <code>watchdog</code>.</p>
+      <p><strong>Eval.</strong> Skill-match precision (did the right skill load for the query?). Skill-following adherence (did the response follow the skill&rsquo;s steps?).</p>
+
+      <h3 id="l5">L5 · Eval harness <em>: the pivot</em></h3>
+      <p><strong>Concept.</strong> Golden datasets, LLM-as-judge with rubric, regression detection. Per-intent bucketing (structural stratification applied to chat intents and tool calls). L5 retroactively evaluates L1&ndash;L4 and becomes the trace-reading substrate every later level depends on.</p>
+      <p><strong>Use case.</strong> A CLI to compare prompts, models, and skill versions across the prior four levels&rsquo; eval suites.</p>
+      <p><strong>Primary analog.</strong> <a href="https://github.com/meshkovQA/Eval-ai-library">meshkovQA/Eval-ai-library</a> (Python, 44 stars) for size and shape. Read <a href="https://github.com/openai/evals">openai/evals</a> (18k stars) for the YAML + grader pattern but don&rsquo;t template: too big. <a href="https://github.com/explodinggradients/ragas">ragas</a> (14k stars) for chat-specific metrics applied to L1&ndash;L2.</p>
+      <p><strong>Imports.</strong> <code>yaml</code>, <code>jsonlines</code>, <code>rich.console.Console</code>, <code>scipy.stats.spearmanr</code> (judge-vs-truth correlation), <code>pandas</code>, optionally <code>litellm</code> for cross-provider judge comparisons.</p>
+      <p><strong>Eval.</strong> This level <em>is</em> the eval. Validation: judge correlation with held-out human spot checks on a 10-example slice.</p>
+
+      <h3 id="l6">L6 · First tool, hand-rolled ReAct</h3>
+      <p><strong>Concept.</strong> The agent loop itself, on the raw OpenAI SDK. Tool schemas generated from Python function signatures, JSON parsing, looping until done. One tool first, kept tight. The first level where the assistant reaches outside the conversation.</p>
+      <p><strong>Use case.</strong> The assistant gains the ability to fetch a URL (or run a web search). The conversation surface starts demanding outside reach, and the assistant earns its first tool.</p>
+      <p><strong>Primary analog.</strong> <a href="https://github.com/simonw/llm">simonw/llm</a>&rsquo;s <code>_tools.py</code> as the battle-tested reference. <a href="https://github.com/gptme/gptme">gptme/gptme</a> (4.3k stars) for the loop shape: a tight, readable Python function.</p>
+      <p><strong>Imports.</strong> <code>httpx</code>, <code>tavily-python</code> or <code>duckduckgo-search</code>, <code>inspect</code> (introspect function signatures into tool schemas).</p>
+      <p><strong>Eval.</strong> Trajectory (right tool, right args, right number of iterations). Task success on a small fetch-or-search dataset.</p>
+
+      <h3 id="l7">L7 · Multi-tool agent</h3>
+      <p><strong>Concept.</strong> Several tools (web search, web fetch, vault search, time/date). Agent decides which to call and in what order. The memory and skills from <a class="xref" href="#l3">L3</a> and <a class="xref" href="#l4">L4</a> govern <em>when</em> to reach out: if the assistant already knows the answer, no tool call should fire.</p>
+      <p><strong>Use case.</strong> &ldquo;Plan my afternoon based on what&rsquo;s in my calendar, what&rsquo;s on Hacker News, and what we said yesterday.&rdquo; Multi-tool orchestration with memory-aware suppression of unnecessary calls.</p>
+      <p><strong>Primary analog.</strong> <a href="https://github.com/gptme/gptme">gptme/gptme</a> (multi-tool loop). <a href="https://github.com/NirDiamant/Agent_Memory_Techniques">NirDiamant/Agent_Memory_Techniques</a> (378 stars) for memory-aware tool routing patterns.</p>
+      <p><strong>Imports.</strong> Continuation of L6 tools plus a router/dispatch layer; <code>sqlite3</code> for tool-call cache.</p>
+      <p><strong>Eval.</strong> Trajectory at higher cardinality (did it skip tools it didn&rsquo;t need?). Task success on multi-tool tasks. Token efficiency: did memory and skills suppress unnecessary tool calls?</p>
+
+      <h3 id="l8">L8 · Agent-written skills</h3>
+      <p><strong>Concept.</strong> The assistant observes patterns across conversations and proposes new <code>SKILL.md</code> drafts. The user approves; the drafts enter the catalog. Procedural learning that closes the gap between <a class="xref" href="#l4">L4</a> (hand-written skills) and <a class="xref" href="#l10">L10</a> (self-improvement).</p>
+      <p><strong>Use case.</strong> After the third time you ask for the same kind of PR review, the assistant says &ldquo;I noticed a pattern; here&rsquo;s a draft skill for it; approve?&rdquo;</p>
+      <p><strong>Primary analog.</strong> <a href="https://github.com/cline/cline">cline/cline</a> Memory Bank (<code>.clinerules/</code> written by the agent itself). <a href="https://github.com/breferrari/obsidian-mind">breferrari/obsidian-mind</a> (2.6k stars) for vault templates. <a href="https://github.com/kepano/obsidian-skills">kepano/obsidian-skills</a> as the format target.</p>
+      <div class="callout" data-kind="caveat">
+        <span class="callout-label">Framing correction</span>
+        <div class="callout-body"><p>Ar9av/obsidian-wiki and kepano/obsidian-skills are <em>not</em> Python agent frameworks: they&rsquo;re markdown-only skill collections that run on Claude Code/Cursor/Codex. We borrow their conventions; we don&rsquo;t port them. L8&rsquo;s skill-drafting loop is original code.</p></div>
+      </div>
+      <p><strong>Imports.</strong> <code>yaml</code>, <code>watchdog</code>, the L4 skill loader. The agent reads its own L5 traces to detect patterns.</p>
+      <p><strong>Eval.</strong> Skill quality: do agent-drafted skills pass the L4 skill-following eval? User acceptance rate: do you actually approve them?</p>
+
+      <h3 id="l9">L9 · Planner + worker, long-horizon</h3>
+      <p><strong>Concept.</strong> Two-role agent split: planner (read-only, proposes) and worker (applies edits). Context compaction. Hand-off contracts. The first level where the assistant takes on tasks that span hours and many steps. Bluesky enters here as a tool the agent calls, subject to <a class="xref" href="#I8">I8</a> (writes are bot-scoped).</p>
+      <p><strong>Use case.</strong> &ldquo;Build me a Bluesky dossier on @karpathy.&rdquo; Or: &ldquo;Audit my vault for orphan notes and propose links across hundreds of files in one pass.&rdquo; Long-horizon work the assistant can finish unattended and hand back a result you review.</p>
+      <p><strong>Primary analog.</strong> <a href="https://github.com/sst/opencode">sst/opencode</a> (161k stars): cleanest open <code>plan</code>/<code>build</code> split. Secondary: <a href="https://github.com/SWE-agent/SWE-agent">SWE-agent</a> (19k stars) mini variant (~100 LOC) for the academic-clean planner→tool loop.</p>
+      <p><strong>Imports.</strong> <code>atproto</code> (Bluesky thread/profile reads; bot-scoped writes), <code>networkx</code> (vault graph analysis), <code>asyncio</code>, <code>collections.deque</code> (work queue).</p>
+      <p><strong>Eval.</strong> Task success on held-out long-horizon tasks (planted Bluesky scenarios using bot fixtures; planted vault setups with known orphans). Trajectory: did the planner stay read-only?</p>
+
+      <h3 id="l10">L10 · Self-improving agent</h3>
+      <p><strong>Concept.</strong> Agent reads its own L5 traces, identifies failure clusters per skill, updates its L4 and L8 skills accordingly. Capstone: closes the eval/improvement loop.</p>
+      <p><strong>Use case.</strong> The assistant gets measurably better at the tasks you actually ask for, without manual prompt-tuning.</p>
+      <p><strong>Primary analog.</strong> <a href="https://github.com/NousResearch/hermes-agent-self-evolution">NousResearch/hermes-agent-self-evolution</a> (3.4k stars): the only repo whose architecture matches the spec literally. Engine: <a href="https://github.com/stanfordnlp/dspy">stanfordnlp/dspy</a> (34k stars) GEPA optimizer over the skill markdown files. Fallback: <a href="https://github.com/EvoAgentX/EvoAgentX">EvoAgentX/EvoAgentX</a> (3k stars).</p>
+      <p><strong>Imports.</strong> <code>dspy</code>, <code>jsonlines</code> (trace store), <code>sqlite3</code> (trace index). Reuses L5 eval harness and L4/L8 skill files.</p>
+      <p><strong>Eval.</strong> Meta-eval: does the agent&rsquo;s self-improvement actually improve held-out task performance? Spearman ρ on a held-out set.</p>
+      <div class="callout" data-kind="caveat">
+        <span class="callout-label">Known wrinkle</span>
+        <div class="callout-body"><p>L10 has no clean production analog. Plan it as a capstone writeup with a thinner code surface than L8 or L9. ~50% blog post, 50% code. Hermes itself last committed 2026-03-29: stale relative to the rest of the analog roster.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <h2 id="decisions">Decisions</h2>
+
+      <div class="decision" data-state="accepted">
+        <div class="decision-head">
+          <span class="decision-id">ADR-001</span>
+          <h3 class="decision-title">Use OpenAI only for the build phase</h3>
+          <span class="status" data-status="approved" data-editable></span>
+        </div>
+        <p><strong>Context.</strong> OpenAI, Anthropic, Gemini, and open-weight models all viable.</p>
+        <p><strong>Decision.</strong> OpenAI only for L1–L10. <code>litellm</code> may enter at L5 to enable cross-provider evals: never earlier.</p>
+        <p><strong>Consequences.</strong> Cheaper iteration on small models; fewer provider-quirk distractions; portfolio doesn&rsquo;t demonstrate provider abstraction (acceptable: see <a href="#NG1">NG1</a>).</p>
+        <dl class="decision-meta">
+          <dt>Alternatives</dt><dd>Anthropic only; <code>litellm</code> from L1; local model via Ollama</dd>
+          <dt>Owner</dt><dd>Scott</dd>
+        </dl>
+      </div>
+
+      <div class="decision" data-state="accepted">
+        <div class="decision-head">
+          <span class="decision-id">ADR-002</span>
+          <h3 class="decision-title">Hand-roll the agent harness on the raw SDK</h3>
+          <span class="status" data-status="approved" data-editable></span>
+        </div>
+        <p><strong>Context.</strong> The agent-framework landscape is crowded; the most credible shipped products avoid frameworks.</p>
+        <p><strong>Decision.</strong> Write our own loop, tool schemas, retries, and memory primitives. No LangChain, CrewAI, LlamaIndex, OpenAI Agents SDK, or Claude Agent SDK.</p>
+        <p><strong>Amendment (2026-05-21).</strong> Pydantic-ai is now the provider/model abstraction layer (see ADR-006); app code talks to pydantic-ai&rsquo;s <code>Agent</code> / <code>Model</code> interface, not the openai SDK directly. The agent harness (loop, tool dispatch, retries, memory) remains hand-rolled. Letta is permitted in specific levels where it meaningfully reduces code. See <a href="#I7">I7</a>.</p>
+        <p><strong>Consequences.</strong> Slower L6 ramp-up; more code in our repo; the resulting skill (&ldquo;a small Claude Code on my laptop&rdquo;) is more credible than a framework integration. The amendment leaves room for comparative experiments without abandoning the hand-rolled identity.</p>
+        <dl class="decision-meta">
+          <dt>Alternatives</dt><dd>LangGraph (most popular); Pydantic-AI (newest credible); OpenAI Agents SDK (vendor-blessed)</dd>
+          <dt>Owner</dt><dd>Scott</dd>
+        </dl>
+      </div>
+
+      <div class="decision" data-state="accepted">
+        <div class="decision-head">
+          <span class="decision-id">ADR-003</span>
+          <h3 class="decision-title">FastAPI backend on every level; frontend varies</h3>
+          <span class="status" data-status="approved" data-editable></span>
+        </div>
+        <p><strong>Context.</strong> The eventual goal is an Obsidian plugin. Obsidian plugins are TypeScript but consume HTTP services.</p>
+        <p><strong>Decision.</strong> Every level exposes a FastAPI backend with a stable API contract. The frontend is per-level (CLI/TUI/web); an Obsidian plugin can be wired on top of any level.</p>
+        <p><strong>Consequences.</strong> Slight overhead at L1; clean integration story; every level is consumable from the same Obsidian plugin once written.</p>
+        <dl class="decision-meta">
+          <dt>Alternatives</dt><dd>CLI-only (no API); separate plugin per level</dd>
+          <dt>Owner</dt><dd>Scott</dd>
+        </dl>
+      </div>
+
+      <div class="decision" data-state="accepted">
+        <div class="decision-head">
+          <span class="decision-id">ADR-004</span>
+          <h3 class="decision-title">Anchor every level in building one growing personal assistant</h3>
+          <span class="status" data-status="approved" data-editable></span>
+        </div>
+        <p><strong>Context.</strong> We need a unifying theme across ten levels that absorbs the breadth of the curriculum (chat, memory, skills, evals, tools, agents) without contortion. We considered three framings: general-purpose-each-app, PKM-anchored-vault, and conversation-anchored-assistant. The strongest analogs we studied (gptme, simonw/llm, Cline, Claude Code itself) are personal assistants that grew capabilities over time, not pipelines over corpora.</p>
+        <p><strong>Decision.</strong> Every level contributes to one growing personal assistant. The assistant talks to the user (<a class="xref" href="#l1">L1</a>&ndash;<a class="xref" href="#l2">L2</a>), learns about the user (<a class="xref" href="#l3">L3</a>), develops skills for the user&rsquo;s recurring tasks (<a class="xref" href="#l4">L4</a>), is graded on its work (<a class="xref" href="#l5">L5</a>), gains tools when the conversation demands them (<a class="xref" href="#l6">L6</a>&ndash;<a class="xref" href="#l7">L7</a>), proposes its own new skills (<a class="xref" href="#l8">L8</a>), takes on long-horizon work (<a class="xref" href="#l9">L9</a>), and improves itself over time (<a class="xref" href="#l10">L10</a>). The Obsidian vault is the memory substrate where everything the assistant knows lives. External surfaces (Bluesky, web, calendars) are <em>tools the assistant earns</em>, not the foundational substrate.</p>
+        <p><strong>Consequences.</strong> Apps feel like one product family (the assistant grew). Each level is immediately personally useful (L1 alone is a chat tool you use daily; L4 is a personalized agent before any tool fires). External-integration risk is bounded: if Bluesky or any other tool turns out to be the wrong fit at L9, it gets swapped without disturbing L1&ndash;L8. The Obsidian-plugin SaaS direction stays credible: the assistant is exactly the kind of thing PKM users want as a plugin, but the assistant is the product, not the plugin.</p>
+        <dl class="decision-meta">
+          <dt>Alternatives</dt><dd>General-purpose framing (each level is its own product); PKM-anchored (vault content is the source data); data-pipeline (ingest a corpus per level)</dd>
+          <dt>Owner</dt><dd>Scott</dd>
+        </dl>
+      </div>
+
+      <div class="decision" data-state="accepted">
+        <div class="decision-head">
+          <span class="decision-id">ADR-005</span>
+          <h3 class="decision-title">Skills-spec compliance from day one</h3>
+          <span class="status" data-status="approved" data-editable></span>
+        </div>
+        <p><strong>Context.</strong> The <a href="https://agentskills.io/specification">agentskills.io</a> spec is the cross-vendor convergence point (Claude Code, Codex CLI, OpenCode, Cursor). Anything we write to the vault as instructions for an agent has a canonical format.</p>
+        <p><strong>Decision.</strong> Markdown files our agents write to the vault that contain agent-readable instructions follow the SKILL.md frontmatter spec. Our own agent reads them too.</p>
+        <p><strong>Consequences.</strong> Same vault is consumable by our agent and by Claude Code/Cursor/Codex: free portfolio multiplier. Locks in some frontmatter shape early.</p>
+        <dl class="decision-meta">
+          <dt>Alternatives</dt><dd>Bespoke frontmatter; no skills at all</dd>
+          <dt>Owner</dt><dd>Scott</dd>
+        </dl>
+      </div>
+
+      <div class="decision" data-state="accepted">
+        <div class="decision-head">
+          <span class="decision-id">ADR-006</span>
+          <h3 class="decision-title">Use pydantic-ai as the provider abstraction layer</h3>
+          <span class="status" data-status="approved" data-editable></span>
+        </div>
+        <p><strong>Context.</strong> <a href="#decisions">ADR-001</a> commits us to OpenAI through the build phase, and <a class="xref" href="#I7">I7</a> commits us to hand-rolling the agent harness. We still want future provider expansion (Anthropic, Gemini, open-weight via Ollama) to be a config change, not a code change. Three shapes considered: a thin in-repo <code>app.provider.LLM</code> wrapper (more code, no community-tested provider parity); a gateway daemon like <a href="https://github.com/openclaw/openclaw">openclaw</a> (multi-channel reach we do not need here, heavier ops surface); <a href="https://github.com/pydantic/pydantic-ai">pydantic-ai</a> (model-agnostic Agent/Model interface from the Pydantic team, lightweight, Pythonic, type-safe). Pydantic-ai is the shape we&rsquo;d hand-roll anyway, and it&rsquo;s already permitted by <a href="#decisions">ADR-002</a>&rsquo;s amendment.</p>
+        <p><strong>Decision.</strong> Use pydantic-ai as the provider/model layer. App code uses pydantic-ai&rsquo;s <code>Agent</code> / <code>Model</code> types and Pydantic result types; it never imports <code>openai</code> directly. Provider swap is a model-string change in config (<code>openai:gpt-4o-mini</code> → <code>anthropic:claude-haiku-4-5</code>). The hand-rolled agent harness (loop, memory, skills, planner/worker per <a class="xref" href="#I7">I7</a>) sits on top of pydantic-ai&rsquo;s per-call provider abstraction. Specific levels may opt to use more of pydantic-ai (e.g., its built-in tool dispatch) as deliberate detours per ADR-002&rsquo;s amendment.</p>
+        <p><strong>Consequences.</strong> One small framework dep (pydantic-ai) added at L1, targeted at exactly this seam. Type safety throughout (Pydantic-native return types). Provider portability becomes config. <a class="xref" href="#I7">I7</a> stays intact for the agent harness; pydantic-ai&rsquo;s role is the narrow provider/model layer, not the full agent loop. Embeddings route through the indexer&rsquo;s own provider-agnostic interface (e.g., <code>chromadb</code>&rsquo;s embedding functions), not through pydantic-ai.</p>
+        <dl class="decision-meta">
+          <dt>Alternatives</dt><dd>Direct OpenAI SDK calls everywhere (prior draft); thin in-repo <code>app.provider.LLM</code> wrapper (more glue code, no community parity); <code>litellm</code> (procedural, less type-safe, ergonomically clunkier for structured outputs); gateway daemon like <a href="https://github.com/openclaw/openclaw">openclaw</a> (multi-channel reach not needed here; could still be layered behind pydantic-ai later if a level wants it)</dd>
+          <dt>Owner</dt><dd>Scott</dd>
+        </dl>
+      </div>
+
+      <div class="decision" data-state="accepted">
+        <div class="decision-head">
+          <span class="decision-id">ADR-007</span>
+          <h3 class="decision-title">Multi-principal from day one (human user plus agent users)</h3>
+          <span class="status" data-status="approved" data-editable></span>
+        </div>
+        <p><strong>Context.</strong> The assistant has at least two users: the author (human) and Claude Code (an agent acting on the author&rsquo;s behalf). Multi-principal support is much cheaper to design in from L1 than to retrofit at L7. A single-principal design embeds &ldquo;the user&rdquo; everywhere (in session IDs, memory tables, trace partitions, recall corpora) and retrofitting requires a migration on every persisted artifact.</p>
+        <p><strong>Decision.</strong> Every API call identifies its calling principal (header for HTTP, argument for CLI). Conversation sessions, semantic-recall corpora, declarative-memory user-facts, and trace records are partitioned by principal. Skills, shared project knowledge, and global facts are not partitioned. Authentication is simple from L1 (header-based API keys for agent principals; OS user for the local CLI) and can grow without schema change.</p>
+        <p><strong>Consequences.</strong> An extra header/argument flows through every endpoint and persistence call from L1. Memory stores carry a <code>principal</code> column or directory partition. Claude Code can ask the assistant &ldquo;what do you remember about Scott?&rdquo; through the same API surface the human CLI uses; the assistant can hold distinct memories about Claude Code itself separately from memories about Scott.</p>
+        <dl class="decision-meta">
+          <dt>Alternatives</dt><dd>Single-user with retrofit later (deferred cost much higher); multi-tenant with full RBAC (too heavy for the curriculum); per-process principal pinning (no programmatic principal switching, breaks the Claude-Code-as-second-user goal)</dd>
+          <dt>Owner</dt><dd>Scott</dd>
+        </dl>
+      </div>
+    </section>
+
+    <section>
+      <h2 id="patterns">Cross-cutting patterns</h2>
+      <p class="lede">Patterns that surfaced across the analog research and become load-bearing structures of the portfolio: designed once, reused across levels.</p>
+
+      <h3>Memory-as-files</h3>
+      <p>The dominant memory pattern for code agents in 2026 (cline Memory Bank, kepano skills, obsidian-mind). The vault <em>is</em> the memory. The assistant reads markdown on session start, writes markdown when it learns something, and amends markdown when facts change. No database needed for the long-term tier. Procedural memory equals a markdown playbook. Central to <a class="xref" href="#l3">L3</a>, <a class="xref" href="#l4">L4</a>, and <a class="xref" href="#l8">L8</a>.</p>
+
+      <h3>Conversation-as-corpus</h3>
+      <p>The assistant&rsquo;s growing chat history is itself the retrievable corpus for <a class="xref" href="#l2">L2</a>. No external dataset needed; the substrate is whatever you&rsquo;ve actually talked about. Same retrieval primitives (embeddings + BM25 + recency) that would be applied to external documents in the original PKM framing now apply to your own past exchanges.</p>
+
+      <h3>Plan/build agent split</h3>
+      <p>Two-role pattern in <a href="https://github.com/sst/opencode">opencode</a> (<code>plan</code>/<code>build</code>), Aider (architect/editor), SWE-agent. One agent reads-and-proposes (read-only safety), another applies edits. More reliable than multi-agent free-for-alls: Cognition&rsquo;s <a href="https://cognition.ai/blog/dont-build-multi-agents">Don&rsquo;t Build Multi-Agents</a> argues this directly. Used at <a class="xref" href="#l9">L9</a>.</p>
+
+      <h3 id="vault-primitives">Vault-write primitives (designed at L1, reused forever)</h3>
+      <p>Three primitives lifted from Ar9av&rsquo;s conventions, designed once in L1&rsquo;s vault-write layer for session transcripts and reused for every subsequent kind of write (memory updates, skill drafts, dossier sections):</p>
+      <ul>
+        <li><strong>Manifest with SHA-256 content-hash delta tracking</strong>: skip re-write on hash match.</li>
+        <li><strong>Staging directory + <code>.patch.md</code> files</strong>: agent proposes diffs against existing pages, never blind-overwrites.</li>
+        <li><strong>Provenance markers</strong> (<code>^[inferred]</code>, <code>^[ambiguous]</code>) plus <code>provenance:</code> frontmatter ratios. These distinguish what the assistant knows directly from what it inferred.</li>
+      </ul>
+
+      <h3>Three-tier structured-output retry (kytmanov)</h3>
+      <p>Tier 1: native structured outputs. Tier 2: regex extraction from a fenced block. Tier 3: retry with prior validation error embedded in the prompt. Treats the model as a self-correcting compiler. First used at <a class="xref" href="#l4">L4</a> (validating skill frontmatter on load) and <a class="xref" href="#l6">L6</a> (parsing tool-call JSON); reused wherever schema validation fails downstream.</p>
+
+      <h3>Skills-spec progressive disclosure (Anthropic)</h3>
+      <p>Three load levels: (1) <code>name</code> + <code>description</code> always in context (~100 tok/skill); (2) body loaded on match; (3) <code>references/</code> and <code>scripts/</code> loaded only when the workflow points to them. We mirror this for our own assistant&rsquo;s skill catalog from <a class="xref" href="#l4">L4</a> onward; agent-written skills at <a class="xref" href="#l8">L8</a> follow the same shape.</p>
+    </section>
+
+    <section>
+      <h2 id="eval">Eval strategy: solving the no-SME problem</h2>
+      <p class="lede">Without a domain expert to grade outputs, evaluations must be deterministic, judged-by-rubric, or trajectory-based.</p>
+
+      <p>Three reusable strategies the portfolio mixes per level:</p>
+      <ol>
+        <li><strong>Verifiable domains.</strong> Tasks where correctness is mechanical: stream-cancel correctness, persistence round-trip, retrieval (labeled past-exchange found?), planted-fact recall, skill-match precision, schema validation. <a class="xref" href="#l1">L1</a> persistence, <a class="xref" href="#l2">L2</a> retrieval, <a class="xref" href="#l3">L3</a> memory probes, <a class="xref" href="#l4">L4</a> skill match, <a class="xref" href="#l9">L9</a> task outcomes use this.</li>
+        <li><strong>LLM-as-judge with rubrics.</strong> Works when the rubric is tight enough that two judges agree. Validate by sampling and self-checking. <a class="xref" href="#l1">L1</a> multi-turn coherence, <a class="xref" href="#l2">L2</a> faithfulness, <a class="xref" href="#l4">L4</a> skill-following adherence, <a class="xref" href="#l8">L8</a> agent-drafted skill quality.</li>
+        <li><strong>Trajectory evals.</strong> Score the path, not just the answer: right tool, right order, right args, right number of iterations, unnecessary calls skipped. Catches regressions when outputs look fine. <a class="xref" href="#l6">L6</a> onward.</li>
+      </ol>
+
+      <div class="callout" data-kind="rationale">
+        <span class="callout-label">Why L5 lives where it does</span>
+        <div class="callout-body"><p>L5 (the eval harness) sits at the pivot because L1–L4 can be graded deterministically: the easy way to learn how evals work. By L6 the outputs are too open-ended for pure determinism, and we need the L5 muscle already trained. Building L5 after L4 is the cheapest possible eval education.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Risks</h2>
+      <table class="risks">
+        <thead>
+          <tr><th>Risk</th><th>Severity</th><th>Likelihood</th><th>Mitigation</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Scope creep: &ldquo;production&rdquo; quality gets confused with enterprise quality; levels drag on.</td>
+            <td class="severity" data-sev="high">High</td>
+            <td>Likely</td>
+            <td>Strict definition-of-done per level. Ship at &ldquo;good enough for a public repo&rdquo;, not &ldquo;deployable to paying customers.&rdquo;</td>
+          </tr>
+          <tr>
+            <td>L10 has no production analog and may become an indefinite research project.</td>
+            <td class="severity" data-sev="med">Medium</td>
+            <td>Likely</td>
+            <td>Time-box at two weeks. If the loop doesn&rsquo;t close, ship as a writeup-heavy capstone rather than full code.</td>
+          </tr>
+          <tr>
+            <td>Eval costs balloon when L5 retro-applies to L1–L4.</td>
+            <td class="severity" data-sev="med">Medium</td>
+            <td>Possible</td>
+            <td>Cache LLM-as-judge calls aggressively (<code>diskcache</code>); use small models for judging where feasible.</td>
+          </tr>
+          <tr>
+            <td>Memory accumulation drift: after months of conversations the L3 declarative store goes stale or self-contradicts.</td>
+            <td class="severity" data-sev="med">Medium</td>
+            <td>Likely</td>
+            <td>L3 includes contradiction-on-update logic (newer facts override older with citation). L5 grades memory recency and consistency as part of routine eval runs.</td>
+          </tr>
+          <tr>
+            <td>User-as-only-tester limitation: the author is the only daily user, so eval coverage skews to one person&rsquo;s patterns.</td>
+            <td class="severity" data-sev="med">Medium</td>
+            <td>Possible</td>
+            <td>L5 fixtures include synthesized chat sessions across distinct user personas. Invite at least one external user by L4 to widen the trace surface.</td>
+          </tr>
+          <tr>
+            <td>Markdown / vault format assumptions break (Obsidian Bases spec, frontmatter conventions, wikilink semantics).</td>
+            <td class="severity" data-sev="low">Low</td>
+            <td>Possible</td>
+            <td>Pin to <a href="https://agentskills.io/specification">agentskills.io</a> spec where applicable. Vault is plain files; Obsidian-specific surface is a thin adapter, not core code.</td>
+          </tr>
+          <tr>
+            <td>Author drift: restart a level with the latest pattern after learning more, never finish.</td>
+            <td class="severity" data-sev="high">High</td>
+            <td>Likely</td>
+            <td>Each level is frozen at its commit. Apply learnings to the <em>next</em> level, not previous ones.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Acceptance: definition of done per level</h2>
+      <ol class="tasks">
+        <li data-status="todo"><span class="task-check" aria-label="cycle status"></span><span class="task-text" contenteditable="true">Public GitHub repo, MIT-licensed, README with install + usage + example output</span><span class="task-owner">scott</span><span class="task-est">-</span></li>
+        <li data-status="todo"><span class="task-check" aria-label="cycle status"></span><span class="task-text" contenteditable="true">Single <code>pyproject.toml</code> with locked deps via <code>uv</code>; Python version pinned</span><span class="task-owner">scott</span><span class="task-est">-</span></li>
+        <li data-status="todo"><span class="task-check" aria-label="cycle status"></span><span class="task-text" contenteditable="true">Ruff + mypy clean; CI smoke test on push</span><span class="task-owner">scott</span><span class="task-est">-</span></li>
+        <li data-status="todo"><span class="task-check" aria-label="cycle status"></span><span class="task-text" contenteditable="true">Configuration via <code>.env</code> + <code>pydantic-settings</code>; <code>.env.example</code> committed</span><span class="task-owner">scott</span><span class="task-est">-</span></li>
+        <li data-status="todo"><span class="task-check" aria-label="cycle status"></span><span class="task-text" contenteditable="true">FastAPI backend with OpenAPI spec at <code>/docs</code></span><span class="task-owner">scott</span><span class="task-est">-</span></li>
+        <li data-status="todo"><span class="task-check" aria-label="cycle status"></span><span class="task-text" contenteditable="true">All chat / streaming / structured-output calls route through pydantic-ai&rsquo;s <code>Agent</code> / <code>Model</code> (no direct <code>openai</code> imports in app code) per ADR-006</span><span class="task-owner">scott</span><span class="task-est">-</span></li>
+        <li data-status="todo"><span class="task-check" aria-label="cycle status"></span><span class="task-text" contenteditable="true">Every API call identifies its principal (header or CLI argument); persistence carries the principal column per ADR-007</span><span class="task-owner">scott</span><span class="task-est">-</span></li>
+        <li data-status="todo"><span class="task-check" aria-label="cycle status"></span><span class="task-text" contenteditable="true">LLM calls and tool invocations logged to local SQLite (request, response, cost, latency, principal) per I5</span><span class="task-owner">scott</span><span class="task-est">-</span></li>
+        <li data-status="todo"><span class="task-check" aria-label="cycle status"></span><span class="task-text" contenteditable="true">Eval suite proportional to level complexity, runnable via <code>just eval</code></span><span class="task-owner">scott</span><span class="task-est">-</span></li>
+        <li data-status="todo"><span class="task-check" aria-label="cycle status"></span><span class="task-text" contenteditable="true">Short writeup in repo (<code>NOTES.md</code>) explaining the one concept the level teaches</span><span class="task-owner">scott</span><span class="task-est">-</span></li>
+      </ol>
+    </section>
+
+    <section>
+      <h2 id="references">References</h2>
+      <p>Analog repos studied, plus primary sources for the patterns.</p>
+
+      <h3>Cloned and read</h3>
+      <ul>
+        <li><a href="https://github.com/Ar9av/obsidian-wiki">Ar9av/obsidian-wiki</a>: <strong>markdown-only skill collection, NOT a Python agent framework.</strong> Vault-as-memory conventions: manifest, <code>hot.md</code>, staging, provenance markers. <em>Conventions reference for L3 declarative memory and beyond.</em></li>
+        <li><a href="https://github.com/kepano/obsidian-skills">kepano/obsidian-skills</a>: Obsidian CEO&rsquo;s official skill bundle. Format target for our assistant&rsquo;s vault-stored playbooks. <em>Schema reference for L4 and L8.</em></li>
+        <li><a href="https://github.com/kytmanov/obsidian-llm-wiki-local">kytmanov/obsidian-llm-wiki-local</a>: three-tier structured-output retry; fill-in example trees instead of JSON Schema. <em>Pattern reference, not a level-1 analog under the current framing. Used wherever schema validation happens (L4 skill load, L6 tool-call parsing).</em></li>
+      </ul>
+
+      <h3>Verified GitHub analogs (active May 2026, &gt;10 stars)</h3>
+      <ul>
+        <li><strong>L1</strong> · <a href="https://github.com/Azure-Samples/rag-postgres-openai-python">Azure-Samples/rag-postgres-openai-python</a> (490 stars) · <a href="https://github.com/basicmachines-co/basic-memory">basic-memory</a> (3k stars) · <a href="https://github.com/simonw/llm">simonw/llm</a> (12k stars, CLI shape)</li>
+        <li><strong>L2</strong> · <a href="https://github.com/benmaster82/Kwipu">benmaster82/Kwipu</a> (80 stars) · <a href="https://github.com/basicmachines-co/basic-memory">basic-memory</a> (3k stars) · <a href="https://github.com/Vasallo94/ObsidianRAG">ObsidianRAG</a> (79 stars)</li>
+        <li><strong>L3</strong> · <a href="https://github.com/cline/cline">cline</a> (61k stars, Memory Bank) · <a href="https://github.com/Ar9av/obsidian-wiki">Ar9av/obsidian-wiki</a> (1.4k stars, vault conventions)</li>
+        <li><strong>L4</strong> · <a href="https://github.com/kepano/obsidian-skills">kepano/obsidian-skills</a> (32k stars, format target) · <a href="https://github.com/cline/cline">cline</a> (procedural memory shape)</li>
+        <li><strong>L5</strong> · <a href="https://github.com/meshkovQA/Eval-ai-library">meshkovQA/Eval-ai-library</a> (44 stars) · <a href="https://github.com/openai/evals">openai/evals</a> (18k stars, read but don&rsquo;t template) · <a href="https://github.com/explodinggradients/ragas">ragas</a> (14k stars)</li>
+        <li><strong>L6</strong> · <a href="https://github.com/simonw/llm">simonw/llm</a> (12k stars, <code>_tools.py</code>) · <a href="https://github.com/gptme/gptme">gptme</a> (4.3k stars, loop shape)</li>
+        <li><strong>L7</strong> · <a href="https://github.com/gptme/gptme">gptme</a> (multi-tool loop) · <a href="https://github.com/NirDiamant/Agent_Memory_Techniques">Agent_Memory_Techniques</a> (378 stars, memory-aware routing)</li>
+        <li><strong>L8</strong> · <a href="https://github.com/cline/cline">cline</a> (Memory Bank written by the agent) · <a href="https://github.com/breferrari/obsidian-mind">obsidian-mind</a> (2.6k stars, vault template) · <a href="https://github.com/kepano/obsidian-skills">kepano/obsidian-skills</a></li>
+        <li><strong>L9</strong> · <a href="https://github.com/sst/opencode">sst/opencode</a> (161k stars) · <a href="https://github.com/SWE-agent/SWE-agent">SWE-agent</a> (19k stars) · <a href="https://github.com/All-Hands-AI/OpenHands">OpenHands</a> (70k stars)</li>
+        <li><strong>L10</strong> · <a href="https://github.com/NousResearch/hermes-agent-self-evolution">hermes-agent-self-evolution</a> (3.4k stars, stale Mar 2026) · <a href="https://github.com/stanfordnlp/dspy">DSPy</a> (34k stars) · <a href="https://github.com/EvoAgentX/EvoAgentX">EvoAgentX</a> (3k stars)</li>
+      </ul>
+
+      <h3>Primary sources</h3>
+      <ul>
+        <li><a href="https://agentskills.io/specification">agentskills.io spec</a> <em>(canonical Skills format)</em></li>
+        <li><a href="https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills">Anthropic, Equipping agents with Agent Skills</a> <em>(rationale)</em></li>
+        <li><a href="https://platform.claude.com/docs/en/docs/agents-and-tools/agent-skills/overview">Anthropic docs, Agent Skills overview</a> <em>(three-level loading model)</em></li>
+        <li><a href="https://cognition.ai/blog/dont-build-multi-agents">Cognition, Don&rsquo;t Build Multi-Agents</a> <em>(context-continuity argument)</em></li>
+        <li><a href="https://www.octomind.dev/blog/why-we-no-longer-use-langchain-for-building-our-ai-agents">Octomind, Why we no longer use LangChain</a> <em>(canonical anti-framework essay)</em></li>
+        <li><a href="https://newsletter.pragmaticengineer.com/p/how-claude-code-is-built">Pragmatic Engineer, How Claude Code is built</a> <em>(&ldquo;every model release, we delete code&rdquo;)</em></li>
+        <li><a href="https://cursor.com/blog/continually-improving-agent-harness">Cursor, Continually improving our agent harness</a> <em>(model-specific tool formats)</em></li>
+      </ul>
+    </section>
+
+    <footer class="doc-footer">
+      <span>atelier-plans · v1</span>
+      <span>last edited <time>2026-05-21</time></span>
+      <span>press <code>⌘E</code> to toggle edit · <code>⌘S</code> to download</span>
+    </footer>
+
+  </article>
+
+  <!-- ============================================================
+       RIGHT RAIL: auto-built TOC + reading progress.
+       ============================================================ -->
+  <aside class="rail">
+    <div class="rail-toc">
+      <h5>On this page</h5>
+    </div>
+  </aside>
+
+</div>
+
+<script id="plan-js-inline">
+/* ============================================================
+   Atelier Plans: runtime
+   Handles: TOC, edit mode, persistence, code highlight,
+            mermaid, task/status cycling, export, copy-diff.
+   ============================================================ */
+
+(function () {
+  'use strict';
+
+  // ---------- toast ----------
+  let toastHost;
+  function toast(msg, ms = 1800) {
+    if (!toastHost) {
+      toastHost = document.createElement('div');
+      toastHost.className = 'toast-host';
+      document.body.appendChild(toastHost);
+    }
+    const t = document.createElement('div');
+    t.className = 'toast';
+    t.textContent = msg;
+    toastHost.appendChild(t);
+    setTimeout(() => t.remove(), ms);
+  }
+
+  // ---------- storage ----------
+  const storageKey = () => 'atelier-plan:' + (location.pathname || '/');
+  function loadState() {
+    try { return JSON.parse(localStorage.getItem(storageKey()) || '{}'); }
+    catch { return {}; }
+  }
+  function saveState(s) {
+    try { localStorage.setItem(storageKey(), JSON.stringify(s)); } catch {}
+  }
+  const state = loadState();
+  function patch(key, val) {
+    state[key] = val;
+    saveState(state);
+  }
+
+  // ---------- section numbering + TOC ----------
+  function buildTOC() {
+    const doc = document.querySelector('.doc');
+    if (!doc) return;
+    const rail = document.querySelector('.rail-toc');
+    if (!rail) return;
+    const headings = doc.querySelectorAll('h2');
+    const ol = document.createElement('ol');
+    headings.forEach((h, i) => {
+      const n = String(i + 1).padStart(2, '0');
+      h.dataset.num = n;
+      if (!h.id) h.id = 'sec-' + n + '-' + slug(h.textContent);
+      const li = document.createElement('li');
+      const a  = document.createElement('a');
+      a.href = '#' + h.id;
+      a.textContent = h.textContent.trim();
+      li.appendChild(a);
+      // sub-TOC for h3s if section is dense
+      const sec = h.closest('section') || h.parentElement;
+      const subs = sec ? sec.querySelectorAll(':scope > h3') : [];
+      if (subs.length >= 3) {
+        const subOl = document.createElement('ol');
+        subOl.className = 'rail-sub';
+        subs.forEach(sub => {
+          if (!sub.id) sub.id = 'sub-' + slug(sub.textContent);
+          const subLi = document.createElement('li');
+          const subA = document.createElement('a');
+          subA.href = '#' + sub.id;
+          subA.textContent = sub.textContent.trim();
+          subLi.appendChild(subA);
+          subOl.appendChild(subLi);
+        });
+        li.appendChild(subOl);
+      }
+      ol.appendChild(li);
+    });
+    rail.appendChild(ol);
+
+    // active-on-scroll
+    const links = rail.querySelectorAll('a');
+    const byId = {};
+    links.forEach(a => byId[a.getAttribute('href').slice(1)] = a);
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        const a = byId[e.target.id];
+        if (!a) return;
+        if (e.isIntersecting) {
+          links.forEach(l => l.classList.remove('active'));
+          a.classList.add('active');
+        }
+      });
+    }, { rootMargin: '-30% 0px -65% 0px' });
+    headings.forEach(h => io.observe(h));
+  }
+
+  function slug(s) {
+    return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 40);
+  }
+
+  // ---------- reading progress ----------
+  function buildProgress() {
+    const rail = document.querySelector('.rail-toc');
+    if (!rail) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'rail-progress';
+    const bar = document.createElement('div');
+    wrap.appendChild(bar);
+    rail.appendChild(wrap);
+    function tick() {
+      const h = document.documentElement;
+      const max = h.scrollHeight - h.clientHeight;
+      const pct = max > 0 ? Math.min(100, (h.scrollTop / max) * 100) : 0;
+      bar.style.width = pct.toFixed(1) + '%';
+    }
+    document.addEventListener('scroll', tick, { passive: true });
+    tick();
+  }
+
+  // ---------- edit mode ----------
+  let editOn = state.edit !== false; // default ON
+  const EDITABLE_SEL = '.doc h1, .doc h2, .doc h3, .doc h4, .doc p, .doc li, .doc blockquote, .doc td, .doc th, .doc .callout-body, .decision-title, .phase .phase-title, .doc-title, .doc-summary, .task-text';
+
+  function wireEditable() {
+    document.querySelectorAll(EDITABLE_SEL).forEach(el => {
+      if (el.closest('.code-block, pre, .mermaid, .rail, .topbar, .doc-footer')) return;
+      el.setAttribute('contenteditable', 'true');
+      el.setAttribute('spellcheck', 'true');
+    });
+    // restore saved edits
+    if (state.edits) {
+      Object.entries(state.edits).forEach(([k, v]) => {
+        const el = document.querySelector('[data-edit-id="' + k + '"]');
+        if (el) el.innerHTML = v;
+      });
+    }
+    // capture changes
+    document.addEventListener('input', (e) => {
+      const el = e.target.closest('[contenteditable="true"]');
+      if (!el) return;
+      const id = ensureEditId(el);
+      const edits = state.edits || {};
+      edits[id] = el.innerHTML;
+      patch('edits', edits);
+    });
+  }
+  let editIdCounter = 0;
+  function ensureEditId(el) {
+    if (!el.dataset.editId) {
+      // stable-ish id from path + ordinal
+      const path = [];
+      let cur = el;
+      while (cur && cur !== document.body) {
+        const p = cur.parentElement;
+        if (!p) break;
+        const i = Array.from(p.children).indexOf(cur);
+        path.unshift(cur.tagName + i);
+        cur = p;
+      }
+      el.dataset.editId = path.join('>');
+    }
+    return el.dataset.editId;
+  }
+
+  function setEditMode(on) {
+    editOn = on;
+    document.body.classList.toggle('edit-off', !on);
+    patch('edit', on);
+    const btn = document.querySelector('[data-action="toggle-edit"]');
+    if (btn) btn.textContent = on ? 'Edit · on' : 'Edit · off';
+  }
+
+  // ---------- task & status cycling ----------
+  const TASK_CYCLE = ['todo', 'doing', 'done', 'blocked'];
+  const STATUS_CYCLE = ['draft', 'in-review', 'approved', 'shipped', 'blocked'];
+
+  function wireTasks() {
+    document.querySelectorAll('.tasks li').forEach((li, i) => {
+      if (!li.dataset.status) li.dataset.status = 'todo';
+      if (!li.dataset.taskId) li.dataset.taskId = 't' + i;
+      const saved = (state.tasks || {})[li.dataset.taskId];
+      if (saved) li.dataset.status = saved;
+      const check = li.querySelector('.task-check');
+      if (check) {
+        check.setAttribute('role', 'checkbox');
+        check.setAttribute('tabindex', '0');
+        check.addEventListener('click', (e) => {
+          if (!editOn) return;
+          const cur = li.dataset.status || 'todo';
+          const next = TASK_CYCLE[(TASK_CYCLE.indexOf(cur) + 1) % TASK_CYCLE.length];
+          li.dataset.status = next;
+          const tasks = state.tasks || {};
+          tasks[li.dataset.taskId] = next;
+          patch('tasks', tasks);
+          e.stopPropagation();
+        });
+      }
+    });
+
+    document.querySelectorAll('.status[data-editable]').forEach((s, i) => {
+      if (!s.dataset.statusId) s.dataset.statusId = 's' + i;
+      const saved = (state.statuses || {})[s.dataset.statusId];
+      if (saved) s.dataset.status = saved;
+      // refresh label text node
+      refreshStatusLabel(s);
+      s.addEventListener('click', () => {
+        if (!editOn) return;
+        const cur = s.dataset.status || 'draft';
+        const next = STATUS_CYCLE[(STATUS_CYCLE.indexOf(cur) + 1) % STATUS_CYCLE.length];
+        s.dataset.status = next;
+        refreshStatusLabel(s);
+        const statuses = state.statuses || {};
+        statuses[s.dataset.statusId] = next;
+        patch('statuses', statuses);
+      });
+    });
+  }
+  function refreshStatusLabel(s) {
+    // find or create the trailing text node after the ::before dot
+    let txt = Array.from(s.childNodes).find(n => n.nodeType === 3);
+    if (!txt) {
+      txt = document.createTextNode('');
+      s.appendChild(txt);
+    }
+    txt.nodeValue = s.dataset.status.replace(/-/g, ' ');
+  }
+
+  // ---------- collapsible sections ----------
+  function wireCollapsible() {
+    document.querySelectorAll('section.collapsible > h2').forEach(h => {
+      h.addEventListener('click', (e) => {
+        // only collapse when the click is on the heading background, not the editable text
+        if (e.target !== h) return;
+        h.parentElement.classList.toggle('collapsed');
+      });
+    });
+  }
+
+  // ---------- code blocks: copy + filename + lang ----------
+  function wireCode() {
+    document.querySelectorAll('.code-block').forEach(block => {
+      const head = block.querySelector('.code-head');
+      if (head && !head.querySelector('.copy')) {
+        const btn = document.createElement('button');
+        btn.className = 'btn ghost copy';
+        btn.type = 'button';
+        btn.textContent = 'copy';
+        btn.dataset.editOnly = '';
+        btn.addEventListener('click', () => {
+          const pre = block.querySelector('pre');
+          if (!pre) return;
+          navigator.clipboard.writeText(pre.innerText).then(() => {
+            btn.textContent = 'copied';
+            setTimeout(() => btn.textContent = 'copy', 1400);
+          });
+        });
+        head.appendChild(btn);
+      }
+    });
+  }
+
+  // ---------- mermaid lazy init ----------
+  function captureMermaidSource() {
+    document.querySelectorAll('pre.mermaid').forEach(el => {
+      if (!el.dataset.mermaidSource) {
+        el.dataset.mermaidSource = el.textContent;
+      }
+    });
+  }
+  function initMermaid() {
+    const blocks = document.querySelectorAll('.mermaid');
+    if (!blocks.length || !window.mermaid) return;
+    captureMermaidSource();
+    window.mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: 'loose',
+      theme: 'base',
+      fontFamily: "Geist, -apple-system, sans-serif",
+      themeVariables: {
+        background: '#F7F4EE',
+        primaryColor: '#EFEAE0',
+        primaryTextColor: '#1E1B16',
+        primaryBorderColor: '#B8B0A0',
+        lineColor: '#6C6557',
+        secondaryColor: '#D6E0D9',
+        tertiaryColor: '#F1D4C5',
+        clusterBkg: '#EFEAE0',
+        clusterBorder: '#D6CFBE',
+        edgeLabelBackground: '#F7F4EE',
+        nodeTextColor: '#1E1B16',
+        actorBkg: '#F1D4C5',
+        actorBorder: '#B8462B',
+        actorTextColor: '#1E1B16',
+        labelBoxBkgColor: '#EFEAE0',
+        labelBoxBorderColor: '#D6CFBE',
+        noteBkgColor: '#EDDFBE',
+        noteBorderColor: '#E0C988',
+      }
+    });
+    window.mermaid.run({ querySelector: '.mermaid' }).catch(err => console.error('mermaid:', err));
+  }
+
+  // ---------- prism lazy init ----------
+  function initPrism() {
+    if (window.Prism) window.Prism.highlightAll();
+  }
+
+  // ---------- export & diff ----------
+  function exportHTML() {
+    const clone = document.documentElement.cloneNode(true);
+    // strip transient classes & runtime attributes from the clone
+    clone.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
+    clone.querySelectorAll('[spellcheck]').forEach(el => el.removeAttribute('spellcheck'));
+    clone.querySelectorAll('.toast-host').forEach(el => el.remove());
+    clone.querySelector('body')?.classList.remove('edit-off');
+    const html = '<!doctype html>\n' + clone.outerHTML;
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = (document.title || 'plan') + '.html';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('Downloaded edited plan');
+  }
+
+  function copyForClaudeCode() {
+    // human-readable changeset for paste-back to Claude Code
+    const lines = ['# Edits to apply (Atelier Plans)'];
+    lines.push('# Source: ' + (location.pathname || ''));
+    lines.push('# Generated: ' + new Date().toISOString());
+    lines.push('');
+    const edits = state.edits || {};
+    Object.entries(edits).forEach(([id, html]) => {
+      const el = document.querySelector('[data-edit-id="' + id + '"]');
+      if (!el) return;
+      const tag = el.tagName.toLowerCase();
+      const label = el.closest('section')?.querySelector('h2')?.textContent?.trim() || '(top)';
+      lines.push('--- ' + label + ' / ' + tag + ' ---');
+      lines.push(stripHTML(html));
+      lines.push('');
+    });
+    const tasks = state.tasks || {};
+    if (Object.keys(tasks).length) {
+      lines.push('## Task status changes');
+      Object.entries(tasks).forEach(([k, v]) => {
+        const el = document.querySelector('[data-task-id="' + k + '"]');
+        const txt = el?.querySelector('.task-text')?.textContent?.trim() || k;
+        lines.push('- [' + v + '] ' + txt);
+      });
+      lines.push('');
+    }
+    const statuses = state.statuses || {};
+    if (Object.keys(statuses).length) {
+      lines.push('## Status changes');
+      Object.entries(statuses).forEach(([k, v]) => lines.push('- ' + k + ': ' + v));
+    }
+    const out = lines.join('\n');
+    navigator.clipboard.writeText(out).then(() => toast('Copied edits: paste to Claude Code'));
+  }
+
+  function stripHTML(s) {
+    const d = document.createElement('div');
+    d.innerHTML = s;
+    return d.textContent.replace(/\s+/g, ' ').trim();
+  }
+
+  // ---------- markdown export ----------
+  function exportMarkdown() {
+    const out = [];
+
+    // ----- YAML frontmatter from .doc-header metadata -----
+    const fm = {};
+    const title = qText('.doc-title');
+    const summary = qText('.doc-summary');
+    if (title)   fm.title = title;
+    if (summary) fm.summary = summary;
+
+    // eyebrow: "Feature design · RFC-014" + status pill
+    const eyebrowText = document.querySelector('.doc-eyebrow > span:nth-of-type(1)')?.textContent?.trim();
+    if (eyebrowText) fm.kind = eyebrowText;
+    const headerStatus = document.querySelector('.doc-header .status');
+    if (headerStatus?.dataset?.status) fm.status = headerStatus.dataset.status;
+
+    // meta dl rows
+    document.querySelectorAll('.doc-meta > div').forEach(d => {
+      const dt = d.querySelector('dt')?.textContent.trim().toLowerCase();
+      const dd = d.querySelector('dd');
+      if (!dt || !dd) return;
+      const tags = dd.querySelectorAll('.tag');
+      if (tags.length) {
+        fm[dt] = Array.from(tags).map(t => t.textContent.trim());
+      } else {
+        const links = dd.querySelectorAll('a');
+        if (links.length > 1) fm[dt] = Array.from(links).map(a => a.textContent.trim());
+        else fm[dt] = dd.textContent.replace(/\s+/g, ' ').trim();
+      }
+    });
+
+    if (Object.keys(fm).length) {
+      out.push('---');
+      for (const [k, v] of Object.entries(fm)) {
+        if (Array.isArray(v)) {
+          out.push(k + ': [' + v.map(yamlScalar).join(', ') + ']');
+        } else {
+          out.push(k + ': ' + yamlScalar(v));
+        }
+      }
+      out.push('---', '');
+    }
+
+    // ----- body -----
+    if (title) out.push('# ' + title, '');
+    if (summary) out.push('_' + summary + '_', '');
+
+    document.querySelectorAll('.doc > section').forEach(sec => {
+      sectionToMd(sec).forEach(l => out.push(l));
+    });
+
+    // dedupe consecutive blanks
+    return out.filter((l, i, a) => !(l === '' && a[i-1] === '')).join('\n').trim() + '\n';
+  }
+
+  function qText(sel) {
+    const el = document.querySelector(sel);
+    return el ? el.textContent.replace(/\s+/g, ' ').trim() : '';
+  }
+
+  function yamlScalar(v) {
+    if (v == null) return '""';
+    const s = String(v);
+    if (s === '') return '""';
+    if (/^[a-zA-Z0-9_\-.@/ ]+$/.test(s)
+        && !/^(true|false|null|yes|no|on|off)$/i.test(s)
+        && !/^[\d\-]/.test(s)) {
+      return s;
+    }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s; // bare date
+    return '"' + s.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+  }
+
+  function sectionToMd(sec) {
+    const out = [];
+    const h2 = sec.querySelector(':scope > h2');
+    if (h2) {
+      const n = h2.dataset.num;
+      const t = textOf(h2);
+      out.push('', (n ? '## ' + n + '. ' + t : '## ' + t), '');
+    }
+    Array.from(sec.children).forEach(node => {
+      if (node === h2) return;
+      nodeToMd(node).forEach(l => out.push(l));
+    });
+    return out;
+  }
+
+  function textOf(el) { return el.textContent.replace(/\s+/g, ' ').trim(); }
+
+  function nodeToMd(el) {
+    if (!el || el.nodeType !== 1) return [];
+
+    if (el.matches('.callout'))      return calloutToMd(el);
+    if (el.matches('.decision'))     return decisionToMd(el);
+    if (el.matches('.changeset'))    return changesetToMd(el);
+    if (el.matches('.journey'))      return journeyToMd(el);
+    if (el.matches('.amendment'))    return amendmentToMd(el);
+    if (el.matches('.relations'))    return relationsToMd(el);
+    if (el.matches('ul.id-list, ol.id-list')) return idListToMd(el);
+    if (el.matches('ol.prompt-stack, ul.prompt-stack')) return promptStackToMd(el);
+    if (el.matches('ol.tasks, ul.tasks')) return tasksToMd(el);
+    if (el.matches('.phases'))       return phasesToMd(el);
+    if (el.matches('details.diff'))  return diffToMd(el);
+    if (el.matches('.code-block'))   return codeBlockToMd(el);
+    if (el.matches('figure.diagram, figure.figure')) return figureToMd(el);
+    if (el.matches('.matrix'))       return matrixToMd(el);
+    if (el.matches('pre.mermaid'))   return fence(el.dataset.mermaidSource || el.textContent, 'mermaid');
+    if (el.matches('pre.ascii'))     return fence(el.textContent, '');
+
+    const tag = el.tagName.toLowerCase();
+    switch (tag) {
+      case 'h3': return ['', '### ' + inlineMd(el), ''];
+      case 'h4': return ['', '#### ' + inlineMd(el), ''];
+      case 'p': {
+        if (el.classList.contains('lede')) return ['', '> _' + inlineMd(el) + '_', ''];
+        return [inlineMd(el), ''];
+      }
+      case 'ul': {
+        const out = [];
+        el.querySelectorAll(':scope > li').forEach(li => out.push('- ' + inlineMd(li)));
+        out.push('');
+        return out;
+      }
+      case 'ol': {
+        const out = []; let i = 1;
+        el.querySelectorAll(':scope > li').forEach(li => out.push((i++) + '. ' + inlineMd(li)));
+        out.push('');
+        return out;
+      }
+      case 'blockquote': {
+        const out = [''];
+        inlineMd(el).split('\n').forEach(line => out.push('> ' + line));
+        out.push('');
+        return out;
+      }
+      case 'table': return tableToMd(el);
+      case 'hr':    return ['', '---', ''];
+      case 'pre':   return fence(el.textContent, '');
+      case 'section': return sectionToMd(el);
+      default: {
+        const out = [];
+        Array.from(el.children).forEach(c => nodeToMd(c).forEach(l => out.push(l)));
+        return out;
+      }
+    }
+  }
+
+  function inlineMd(el) {
+    let s = '';
+    el.childNodes.forEach(n => {
+      if (n.nodeType === 3) { s += n.textContent; return; }
+      if (n.nodeType !== 1) return;
+      const t = n.tagName.toLowerCase();
+      const inner = inlineMd(n);
+      switch (t) {
+        case 'strong': case 'b': s += '**' + inner + '**'; break;
+        case 'em': case 'i':     s += '_' + inner + '_'; break;
+        case 'code':             s += '`' + n.textContent + '`'; break;
+        case 'a': {
+          // xref-style links render bare in markdown
+          if (n.classList.contains('xref')) {
+            s += '`§' + (inner.replace(/^§/, '')) + '`';
+          } else {
+            s += '[' + inner + '](' + (n.getAttribute('href') || '#') + ')';
+          }
+          break;
+        }
+        case 'br':               s += '  \n'; break;
+        case 'span': case 'time':case 'small': s += inner; break;
+        default:                 s += inner;
+      }
+    });
+    return s.replace(/[ \t]+/g, ' ').replace(/\n /g, '\n').trim();
+  }
+
+  function idListToMd(el) {
+    const out = [''];
+    const kind = el.dataset.kind || '';
+    el.querySelectorAll(':scope > li').forEach(li => {
+      const tag = li.querySelector('.id-tag')?.textContent.trim() || '';
+      const body = li.querySelector('.id-body');
+      const text = body ? inlineMd(body) : inlineMd(li);
+      out.push('- **' + tag + (kind ? ' (' + kind + ')' : '') + '.** ' + text);
+    });
+    out.push('');
+    return out;
+  }
+
+  function journeyToMd(el) {
+    const out = [''];
+    const id = el.querySelector('.journey-id')?.textContent.trim() || '';
+    const title = el.querySelector('.journey-title')?.textContent.trim() || '';
+    out.push('### ' + (id ? id + ': ' : '') + title, '');
+    el.querySelectorAll('.journey-body > section').forEach(section => {
+      const h = section.querySelector('h4');
+      if (h) out.push('**' + h.textContent.trim() + '**', '');
+      const isSteps = section.querySelector('.journey-steps');
+      if (isSteps) {
+        section.querySelectorAll('.journey-steps > li').forEach(li => {
+          out.push('- [ ] ' + inlineMd(li));
+        });
+      } else {
+        section.querySelectorAll('ul li, ol li').forEach(li => {
+          out.push('- ' + inlineMd(li));
+        });
+      }
+      out.push('');
+    });
+    return out;
+  }
+
+  function amendmentToMd(el) {
+    const label = el.querySelector('.amendment-label')?.textContent.trim() || 'Amended';
+    const body = el.querySelector('p');
+    return ['', '> **' + label + '**: ' + (body ? inlineMd(body) : ''), ''];
+  }
+
+  function relationsToMd(el) {
+    const out = [''];
+    el.querySelectorAll('.relation').forEach(r => {
+      const label = r.querySelector('.relation-label')?.textContent.trim() || '';
+      const body  = r.querySelector('.relation-body');
+      if (body) out.push('- **' + label + ':** ' + inlineMd(body));
+    });
+    out.push('');
+    return out;
+  }
+
+  function promptStackToMd(el) {
+    const out = ['', '**Composed stack** (registration order):', ''];
+    el.querySelectorAll(':scope > li').forEach((li, i) => {
+      const tag = li.querySelector('.stack-tag')?.textContent.trim() || '';
+      const body = li.querySelector('.stack-body');
+      const state = li.dataset.state || '';
+      out.push((i + 1) + '. `<' + tag + '>`: ' + (body ? inlineMd(body) : '') + (state ? ' _(' + state + ')_' : ''));
+    });
+    out.push('');
+    return out;
+  }
+
+  function calloutToMd(el) {
+    const kind  = (el.dataset.kind || 'note').toUpperCase();
+    const label = el.querySelector('.callout-label')?.textContent.trim() || kind;
+    const map = { goal: 'TIP', 'non-goal': 'NOTE', question: 'IMPORTANT', assumption: 'NOTE',
+                  risk: 'CAUTION', key: 'IMPORTANT', note: 'NOTE' };
+    const gh = map[(el.dataset.kind || 'note')] || 'NOTE';
+    const out = ['', '> [!' + gh + '] ' + label];
+    const body = el.querySelector('.callout-body');
+    if (body) {
+      const inner = [];
+      Array.from(body.children).forEach(c => nodeToMd(c).forEach(l => inner.push(l)));
+      inner.forEach(l => out.push(l === '' ? '>' : '> ' + l));
+    }
+    out.push('');
+    return out;
+  }
+
+  function decisionToMd(el) {
+    const id    = el.querySelector('.decision-id')?.textContent.trim() || '';
+    const title = el.querySelector('.decision-title')?.textContent.trim() || '';
+    const stat  = el.querySelector('.status')?.dataset?.status || '';
+    const out = ['', '### ' + (id ? id + ': ' : '') + title];
+    if (stat) out.push('', '_Status: ' + stat + '_');
+    out.push('');
+    el.querySelectorAll(':scope > p').forEach(p => out.push(inlineMd(p), ''));
+    const meta = el.querySelector('.decision-meta');
+    if (meta) {
+      meta.querySelectorAll('dt').forEach(dt => {
+        const dd = dt.nextElementSibling;
+        if (dd) out.push('- **' + dt.textContent.trim() + ':** ' + dd.textContent.replace(/\s+/g, ' ').trim());
+      });
+      out.push('');
+    }
+    return out;
+  }
+
+  function changesetToMd(el) {
+    const out = ['', '**Changeset**', ''];
+    el.querySelectorAll('ul.tree > li').forEach(li => {
+      const op = li.dataset.op;
+      const sym = op === 'add' ? '+' : op === 'del' ? '−' : '~';
+      const path = li.querySelector('.path')?.textContent.trim() || '';
+      const note = li.querySelector('.note')?.textContent.trim() || '';
+      out.push('- `' + sym + ' ' + path + '`' + (note ? ': ' + note : ''));
+    });
+    out.push('');
+    return out;
+  }
+
+  function tasksToMd(el) {
+    const out = [''];
+    el.querySelectorAll(':scope > li').forEach(li => {
+      const status = li.dataset.status || 'todo';
+      const box = status === 'done' ? 'x' : status === 'doing' ? '·' : status === 'blocked' ? '!' : ' ';
+      const text   = li.querySelector('.task-text')?.textContent.replace(/\s+/g, ' ').trim() || '';
+      const owner  = li.querySelector('.task-owner')?.textContent.trim() || '';
+      const est    = li.querySelector('.task-est')?.textContent.trim() || '';
+      const tail = [];
+      if (status !== 'todo' && status !== 'done') tail.push(status);
+      if (owner) tail.push(owner);
+      if (est && est !== ': ') tail.push(est);
+      out.push('- [' + box + '] ' + text + (tail.length ? ' _(' + tail.join(' · ') + ')_' : ''));
+    });
+    out.push('');
+    return out;
+  }
+
+  function phasesToMd(el) {
+    const out = ['', '**Phases**', ''];
+    el.querySelectorAll('.phase').forEach(p => {
+      const label = p.querySelector('.phase-label')?.textContent.trim();
+      const title = p.querySelector('.phase-title')?.textContent.trim();
+      const state = p.dataset.state || '';
+      out.push('- **' + label + ': ' + title + '** _(' + state + ')_');
+      p.querySelectorAll('ul li').forEach(li => out.push('  - ' + li.textContent.trim()));
+    });
+    out.push('');
+    return out;
+  }
+
+  function diffToMd(el) {
+    const summary = el.querySelector('summary')?.textContent.trim() || 'diff';
+    const out = ['', '**' + summary + '**', '', '```diff'];
+    el.querySelectorAll('.line').forEach(l => {
+      const sym = l.classList.contains('add') ? '+' : l.classList.contains('del') ? '-' : ' ';
+      out.push(sym + l.textContent);
+    });
+    out.push('```', '');
+    return out;
+  }
+
+  function codeBlockToMd(el) {
+    const filename = el.querySelector('.filename')?.textContent.trim() || '';
+    const lang = el.querySelector('.lang')?.textContent.trim().toLowerCase() || '';
+    const code = el.querySelector('pre')?.textContent || '';
+    const out = [''];
+    if (filename) out.push('**' + filename + '**', '');
+    out.push('```' + lang, code.replace(/\n+$/, ''), '```', '');
+    return out;
+  }
+
+  function figureToMd(el) {
+    const out = [''];
+    const captionEl = el.querySelector('.figure-caption, .caption, figcaption');
+    const caption = captionEl?.textContent.replace(/\s+/g, ' ').trim();
+    Array.from(el.children).forEach(n => {
+      if (n === captionEl) return;
+      if (n.matches('pre.mermaid')) out.push('```mermaid', (n.dataset.mermaidSource || n.textContent).trim(), '```');
+      else if (n.matches('pre.ascii')) out.push('```', n.textContent.replace(/\n+$/, ''), '```');
+      else if (n.matches('pre'))    out.push('```', n.textContent.replace(/\n+$/, ''), '```');
+      else if (n.tagName === 'SVG' || n.querySelector?.('svg')) {
+        out.push('<!-- inline SVG illustration (preserved as HTML) -->');
+        out.push(n.outerHTML);
+      }
+      else nodeToMd(n).forEach(l => out.push(l));
+    });
+    if (caption) out.push('', '_Figure. ' + caption + '_');
+    out.push('');
+    return out;
+  }
+
+  function matrixToMd(el) {
+    const out = ['', '**Matrix**', ''];
+    const cells = el.querySelectorAll('.cell');
+    const xs = Array.from(el.querySelectorAll('.axis-x')).map(a => a.textContent.trim());
+    const ys = Array.from(el.querySelectorAll('.axis-y')).map(a => a.textContent.trim());
+    out.push('|   | ' + xs.join(' | ') + ' |');
+    out.push('|---|' + xs.map(() => '---|').join(''));
+    for (let r = 0; r < ys.length; r++) {
+      const row = ['**' + ys[r] + '**'];
+      for (let c = 0; c < xs.length; c++) {
+        const cell = cells[r * xs.length + c];
+        if (!cell) { row.push(''); continue; }
+        const lbl = cell.querySelector('.cell-label')?.textContent.trim() || '';
+        const txt = Array.from(cell.querySelectorAll('p')).map(p => p.textContent.trim()).join(' ');
+        row.push((lbl ? '_' + lbl + '_ ' : '') + txt);
+      }
+      out.push('| ' + row.join(' | ') + ' |');
+    }
+    out.push('');
+    return out;
+  }
+
+  function tableToMd(el) {
+    const out = [''];
+    const headers = Array.from(el.querySelectorAll('thead th')).map(th => th.textContent.trim());
+    if (headers.length) {
+      out.push('| ' + headers.join(' | ') + ' |');
+      out.push('|' + headers.map(() => '---').join('|') + '|');
+    }
+    el.querySelectorAll('tbody tr').forEach(tr => {
+      const cells = Array.from(tr.querySelectorAll('td')).map(td =>
+        td.textContent.replace(/\s+/g, ' ').replace(/\|/g, '\\|').trim());
+      out.push('| ' + cells.join(' | ') + ' |');
+    });
+    out.push('');
+    return out;
+  }
+
+  function fence(text, lang) {
+    return ['', '```' + (lang || ''), text.replace(/\n+$/, ''), '```', ''];
+  }
+
+  function copyMarkdown() {
+    const md = exportMarkdown();
+    navigator.clipboard.writeText(md).then(() => toast('Copied as markdown'));
+  }
+
+  function resetEdits() {
+    if (!confirm('Discard all browser edits and reload the original?')) return;
+    localStorage.removeItem(storageKey());
+    location.reload();
+  }
+
+  // ---------- dropdown menu ----------
+  function wireMenus() {
+    document.querySelectorAll('[data-menu]').forEach(wrap => {
+      const toggle = wrap.querySelector('[data-menu-toggle]');
+      if (!toggle) return;
+      toggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const wasOpen = wrap.classList.contains('open');
+        document.querySelectorAll('[data-menu].open').forEach(w => w.classList.remove('open'));
+        if (!wasOpen) wrap.classList.add('open');
+      });
+      wrap.querySelectorAll('.btn-menu button').forEach(b => {
+        b.addEventListener('click', () => setTimeout(() => wrap.classList.remove('open'), 0));
+      });
+    });
+    document.addEventListener('click', () => {
+      document.querySelectorAll('[data-menu].open').forEach(w => w.classList.remove('open'));
+    });
+  }
+
+  // ---------- top bar wiring ----------
+  function wireTopbar() {
+    document.querySelectorAll('[data-action]').forEach(btn => {
+      const a = btn.dataset.action;
+      btn.addEventListener('click', () => {
+        if (a === 'toggle-edit')      setEditMode(!editOn);
+        else if (a === 'export-html') exportHTML();
+        else if (a === 'copy-diff')   copyForClaudeCode();
+        else if (a === 'copy-md')     copyMarkdown();
+        else if (a === 'reset-edits') resetEdits();
+        else if (a === 'print')       window.print();
+      });
+    });
+  }
+
+  // ---------- keyboard shortcuts ----------
+  function wireKeys() {
+    document.addEventListener('keydown', (e) => {
+      if (e.target.closest('[contenteditable="true"]')) return;
+      if ((e.metaKey || e.ctrlKey) && e.key === 'e') { e.preventDefault(); setEditMode(!editOn); }
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); exportHTML(); }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'p' && e.shiftKey) { e.preventDefault(); window.print(); }
+    });
+  }
+
+  // ---------- diagram helper: sparkline ----------
+  function renderSparks() {
+    document.querySelectorAll('.spark[data-values]').forEach(el => {
+      const vals = el.dataset.values.split(',').map(Number);
+      if (!vals.length) return;
+      const w = vals.length * 8, h = 18;
+      const min = Math.min(...vals), max = Math.max(...vals);
+      const range = max - min || 1;
+      const d = vals.map((v, i) => {
+        const x = i * (w / (vals.length - 1 || 1));
+        const y = h - ((v - min) / range) * (h - 2) - 1;
+        return (i === 0 ? 'M' : 'L') + x.toFixed(1) + ' ' + y.toFixed(1);
+      }).join(' ');
+      el.innerHTML = '<svg viewBox="0 0 ' + w + ' ' + h + '" width="' + w + '" height="' + h + '"><path d="' + d + '"/></svg>';
+    });
+  }
+
+  // ---------- init ----------
+  function init() {
+    captureMermaidSource();
+    buildTOC();
+    buildProgress();
+    wireEditable();
+    wireTasks();
+    wireCollapsible();
+    wireCode();
+    wireTopbar();
+    wireMenus();
+    wireKeys();
+    renderSparks();
+    setEditMode(editOn);
+    // mermaid + prism may be loaded async
+    if (window.mermaid) initMermaid();
+    else window.addEventListener('mermaid-ready', initMermaid);
+    if (window.Prism) initPrism();
+    else window.addEventListener('prism-ready', initPrism);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+
+  // expose a small API for ad-hoc use
+  window.AtelierPlans = { toast, exportHTML, exportMarkdown, copyForClaudeCode, copyMarkdown, resetEdits, setEditMode };
+})();
+
+</script>
+</body>
+</html>
