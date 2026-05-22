@@ -3,12 +3,29 @@
 
 `scratch/` is a personal sandbox for portfolio and learning work toward an Agent Engineer role. It is not a single application; it is several adjacent things in one tree.
 
-- `docs/plans/` design docs and progression plans; the canonical form is markdown, with the atelier-plans authoring HTML kept under `docs/plans/html/`.
+- `docs/plans/` progression plans and design docs in their canonical markdown form; atelier-plans authoring HTML is archived under `docs/plans/html/`.
 - `dist/atelier-plans/` the packaged `atelier-plans` skill itself. Treat as a published artifact, not active source.
 - `analogs/` reference repos cloned for study (`obsidian-wiki`, `obsidian-llm-wiki-local`, `obsidian-skills`). Read-only by default. Do not modify unless explicitly asked.
 - `.claude/skills/` locally installed skills for this project.
 
-Default language: Python. Default package manager: `uv` (not pip or poetry). Plans are authored as HTML via `atelier-plans` rather than Markdown when they are non-trivial.
+Default language: Python. Default package manager: `uv` (not pip or poetry).
+
+Non-trivial plans move through two distinct forms. They are brainstormed and drafted interactively as atelier-plans HTML, then converted to markdown once finalized (or close to it); markdown is the canonical working form. These are two different things, not interchangeable: HTML is the drafting medium, markdown is the finished artifact. Returning to the atelier to brainstorm a new piece (a later phase, a major revision) is expected, and produces a fresh HTML draft that later converts back to markdown.
+
+## Public/private boundary
+
+The portfolio is two separate sibling repositories. Do not merge them; do not rename `scratch/` into the public repo.
+
+- **Private: `scratch/`.** Orchestration and strategy: progression plans, `docs/tbc/` notes, `analogs/`, and all career framing. Private git remote. Never published.
+- **Public: `assistant/`.** The product plus its own docs (README, ARCHITECTURE, ADRs, NOTES, CHANGELOG). Public git remote. Born as a fresh `git init` in a sibling directory to `scratch/`, never a rename of it.
+
+Rules:
+
+- Career and portfolio framing ("portfolio", "hiring manager", "defensible", "interview", "Agent Engineer credential", and the like) is private-only. It must never enter the public repo's working tree or git history.
+- Write the public repo in product voice: what the system is and why it is designed that way, never why it advances Scott's career.
+- Architecture and design docs are public, but authored fresh in `assistant/`, derived from the private plan rather than copied out of it. The progression plan itself stays private.
+- The boundary is structural, not procedural: private material is never committed to the public repo, so there is no "strip before release" step. Git history is permanent and publication is irreversible.
+- Public repo links never point into `scratch/`; the public repo must be self-contained.
 
 ## Style preferences
 
