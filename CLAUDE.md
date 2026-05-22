@@ -22,10 +22,21 @@ The portfolio is two separate sibling repositories. Do not merge them; do not re
 Rules:
 
 - Career and portfolio framing ("portfolio", "hiring manager", "defensible", "interview", "Agent Engineer credential", and the like) is private-only. It must never enter the public repo's working tree or git history.
-- Write the public repo in product voice: what the system is and why it is designed that way, never why it advances Scott's career.
+- Write the public repo in Scott's own voice: relaxed and plain-spoken, like a capable person showing a peer what they built, not a clinical spec or an academic paper. Contractions and loose sentences are fine; do not over-formalize. Keep exact, precise wording for places where it affects correctness (API contracts, invariants, setup steps). It still covers what the system is and why it is built that way; it just never mentions why it advances Scott's career.
 - Architecture and design docs are public, but authored fresh in `assistant/`, derived from the private plan rather than copied out of it. The progression plan itself stays private.
 - The boundary is structural, not procedural: private material is never committed to the public repo, so there is no "strip before release" step. Git history is permanent and publication is irreversible.
 - Public repo links never point into `scratch/`; the public repo must be self-contained.
+
+## Build coordination
+
+The project is built by two coordinated Claude Code instances, one per repo:
+
+- **Planning instance (this one, in `scratch/`).** Scott and Claude do the heavy planning here: brainstorming in the atelier, finalizing plans to markdown, choosing phase scope and order. This is the planner.
+- **Implementation instance (in `assistant/`).** A separate Claude Code instance that takes a finalized phase plan and does the implementation and testing. This is the worker.
+
+The handoff artifact is a finalized, product-voiced phase plan: the planning instance produces it, the implementation instance consumes it. The implementation instance works only inside `assistant/` and only ever sees product-voiced material, so the public/private boundary holds by construction. The exact delivery mechanism is settled when phase 1 is planned.
+
+This is the planner/worker split (the same pattern the portfolio reaches in phase 9) applied to the build itself: each instance keeps a focused context, so planning detail does not clutter implementation and vice versa.
 
 ## Style preferences
 
