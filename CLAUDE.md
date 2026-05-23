@@ -50,6 +50,8 @@ docs/
       NN-<slug>.html                ← optional writing-plans iteration draft
   specs/
     NN-<slug>.md                    ← phase spec (private, conversation-rich)
+  references/
+    <name>.md                       ← cross-phase reference docs (product-voiced)
 ```
 
 `NN` is the two-digit zero-padded phase number (`00`, `01`, ..., `10`). `<slug>` matches the eventual branch name where applicable (e.g., `01-transcripts` pairs with `feat/transcripts`).
@@ -58,15 +60,20 @@ The **spec** captures brainstorming Q&A, exploration of alternatives, and any pl
 
 The **plan** is written in product voice from the start: zero portfolio framing, zero "interview" or career narrative. It is the handoff artifact.
 
-At handoff time, the planning instance copies the finalized plan into `assistant/`:
+**Reference docs** in `docs/references/` hold cross-phase context the implementer needs that the plan body no longer carries: tech-stack rationale, project-wide conventions, patterns introduced in one phase and reused in later ones (vault-write primitives, test-seam patterns), inter-phase contracts (SSE event shape, fixture frontmatter). Each file covers one concern. References are product-voiced like plans (no portfolio framing) and authored by the planner alongside the plan. See `.claude/skills/writing-plans/SKILL.md` §Reference Docs for when to author one.
+
+At handoff time, the planning instance copies the finalized plan plus any new or amended references into `assistant/`:
 
 ```
 cp docs/plans/NN-<slug>.md ../assistant/docs/plans/NN-<slug>.md
+cp docs/references/<name>.md ../assistant/docs/references/<name>.md   # for each ref this phase introduces or changes
 ```
 
-The `scratch/` copy is the immutable "as handed over" snapshot. The `assistant/` copy is the live execution document the implementation instance edits as tasks complete. The implementation instance never reads from `scratch/`.
+The `scratch/` copies are the immutable "as handed over" snapshots. The `assistant/` copies are live: the implementation instance edits the plan as tasks complete, and may amend reference docs when implementation reveals refinement. The implementation instance never reads from `scratch/`.
 
-Architecture docs, ADRs, and NOTES.md sections in `assistant/` are authored fresh during implementation, derived from the progression plan + spec + plan triple. They are not copied out of `scratch/`.
+When the next phase is planned, the planner reads `assistant/docs/references/*` first to pick up implementer-side amendments, reconciles them into the `scratch/` canonical copy, then amends further as the new phase requires. References are alive across phases; plans are frozen per phase.
+
+Architecture docs, ADRs, and NOTES.md sections in `assistant/` are authored fresh during implementation, derived from the progression plan + spec + plan + references quad. They are not copied out of `scratch/`.
 
 The progression plan tracks status by appending an **Artifacts** line to each phase section once that phase has spec and plan files:
 
