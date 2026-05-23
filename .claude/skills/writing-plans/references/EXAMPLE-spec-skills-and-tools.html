@@ -1,0 +1,2534 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Skills and Tools Subsystem: Spec</title>
+  <meta name="description" content="Lands ToolCapability, SkillRegistry + Skill tool, and the Instructions-composer migration together.">
+  <style id="plan-css-inline">
+/* ============================================================
+   Atelier Plans visual system for HTML planning documents
+   Original design. Warm parchment / terracotta / moss.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  /* color */
+  --ink:           #1E1B16;
+  --ink-muted:     #6C6557;
+  --ink-faint:     #9A9384;
+  --canvas:        #F7F4EE;
+  --surface-1:     #EFEAE0;
+  --surface-2:     #E5DFD2;
+  --border:        #D6CFBE;
+  --border-strong: #B8B0A0;
+  --primary:       #B8462B;
+  --primary-hover: #9A3820;
+  --primary-soft:  #F1D4C5;
+  --moss:          #3D5A4C;
+  --moss-soft:     #D6E0D9;
+  --ochre:         #B07B1F;
+  --ochre-soft:    #EDDFBE;
+  --code-bg:       #EBE5D6;
+  --highlight:     #FAEAB0;
+
+  /* type */
+  --font-display: 'Instrument Serif', Georgia, serif;
+  --font-body:    'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* spacing scale (8px base) */
+  --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;
+  --s-5: 24px; --s-6: 32px; --s-7: 48px; --s-8: 64px;
+  --s-9: 96px; --s-10: 128px;
+
+  /* radii */
+  --r-sm: 4px; --r-md: 6px; --r-lg: 12px; --r-pill: 9999px;
+
+  /* shadows */
+  --shadow-card:     0 1px 0 rgba(30,27,22,0.04), 0 1px 2px rgba(30,27,22,0.04);
+  --shadow-elevated: 0 4px 24px rgba(30,27,22,0.08);
+  --shadow-focus:    0 0 0 2px var(--canvas), 0 0 0 4px var(--primary);
+
+  /* layout */
+  --col-body:  min(72ch, 100%);
+  --col-wide:  min(96ch, 100%);
+  --col-full:  100%;
+  --rail-w:    260px;
+}
+
+/* ---------- reset ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 16.5px;
+  line-height: 1.62;
+  letter-spacing: -0.005em;
+  color: var(--ink);
+  background: var(--canvas);
+  font-feature-settings: "ss01", "cv11";
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: var(--primary-soft); color: var(--ink); }
+
+/* ---------- page chrome ---------- */
+.page {
+  display: grid;
+  grid-template-columns: 1fr minmax(0, 760px) var(--rail-w) 1fr;
+  gap: 0 var(--s-7);
+  padding: var(--s-7) var(--s-6) var(--s-9);
+}
+.page > .doc      { grid-column: 2 / 3; min-width: 0; }
+.page > .rail     { grid-column: 3 / 4; }
+.page > .topbar   { grid-column: 1 / -1; }
+
+@media (max-width: 1100px) {
+  .page { grid-template-columns: 1fr minmax(0, 760px) 1fr; }
+  .page > .doc  { grid-column: 2 / 3; }
+  .page > .rail { display: none; }
+}
+@media (max-width: 720px) {
+  .page { padding: var(--s-5) var(--s-4) var(--s-7); }
+}
+
+/* ---------- top bar ---------- */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  padding: var(--s-3) 0 var(--s-6);
+  margin-bottom: var(--s-4);
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.topbar .crumbs {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-muted);
+  letter-spacing: -0.01em;
+}
+.topbar .crumbs a { color: inherit; }
+.topbar .crumbs .sep { opacity: 0.4; margin: 0 6px; }
+.topbar .spacer { flex: 1; }
+.topbar .btn-row { display: flex; gap: var(--s-2); }
+
+/* ---------- buttons ---------- */
+.btn {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: var(--r-md);
+  background: var(--canvas);
+  color: var(--ink);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 120ms, border-color 120ms, color 120ms;
+}
+.btn:hover  { background: var(--surface-1); border-color: var(--border-strong); }
+.btn:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
+.btn.primary  { background: var(--primary); color: #fff; border-color: var(--primary); }
+.btn.primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
+.btn.ghost    { background: transparent; border-color: transparent; color: var(--ink-muted); }
+.btn.ghost:hover { color: var(--ink); background: var(--surface-1); }
+.btn .kbd { font-family: var(--font-mono); font-size: 11px; opacity: 0.6; }
+
+/* dropdown menu (Copy ▾) */
+.btn-menu-wrap { position: relative; }
+.btn-menu-wrap > .btn[data-menu-toggle]::after {
+  content: "▾";
+  margin-left: 4px;
+  opacity: 0.6;
+  font-size: 10px;
+}
+.btn-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: var(--canvas);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-elevated);
+  padding: 4px;
+  min-width: 260px;
+  z-index: 1000;
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+}
+.btn-menu-wrap.open .btn-menu { display: flex; }
+.btn-menu > button {
+  font: inherit;
+  font-size: 13px;
+  background: none;
+  border: none;
+  padding: 8px 12px;
+  text-align: left;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.btn-menu > button:hover { background: var(--surface-1); }
+.btn-menu > button .menu-label { font-weight: 500; }
+.btn-menu > button .menu-hint {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-faint);
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+}
+
+/* ---------- header / meta ---------- */
+.doc-header { margin-bottom: var(--s-7); }
+.doc-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin-bottom: var(--s-3);
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+}
+.doc-eyebrow .dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--primary);
+}
+.doc-title {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(40px, 6.2vw, 64px);
+  line-height: 1.02;
+  letter-spacing: -0.025em;
+  margin: 0 0 var(--s-3);
+  color: var(--ink);
+  text-wrap: balance;
+}
+.doc-title em {
+  font-style: italic;
+  color: var(--primary);
+}
+.doc-summary {
+  font-size: 19px;
+  line-height: 1.5;
+  color: var(--ink-muted);
+  margin: 0 0 var(--s-5);
+  max-width: 60ch;
+  text-wrap: pretty;
+}
+.doc-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-5);
+  font-size: 13px;
+  padding-top: var(--s-4);
+  border-top: 1px solid var(--border);
+}
+.doc-meta dt {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-faint);
+  margin-bottom: 2px;
+}
+.doc-meta dd { margin: 0; color: var(--ink); }
+.doc-meta dd a { color: var(--primary); }
+
+/* status pill in header */
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 8px;
+  border-radius: var(--r-pill);
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+  color: var(--ink);
+}
+.status::before {
+  content: ""; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--ink-faint);
+}
+.status[data-status="draft"]    { background: var(--surface-1); }
+.status[data-status="draft"]::before    { background: var(--ink-faint); }
+.status[data-status="in-review"]{ background: var(--ochre-soft); border-color: #E0C988; }
+.status[data-status="in-review"]::before{ background: var(--ochre); }
+.status[data-status="approved"] { background: var(--moss-soft); border-color: #B5C6BB; }
+.status[data-status="approved"]::before { background: var(--moss); }
+.status[data-status="shipped"]  { background: var(--primary-soft); border-color: #E2B59C; color: var(--primary-hover); }
+.status[data-status="shipped"]::before  { background: var(--primary); }
+.status[data-status="blocked"]  { background: #F4D9CF; border-color: #E0B19E; }
+.status[data-status="blocked"]::before  { background: #B83A1E; }
+
+/* tag chips */
+.tags { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.tag {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  background: var(--surface-1);
+  color: var(--ink-muted);
+  border: 1px solid var(--border);
+}
+
+/* ---------- spec relations (Depends on / Blocks / Supersedes / Amended) ---------- */
+.relations {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: var(--s-2) var(--s-4);
+  margin: var(--s-5) 0 0;
+  padding-top: var(--s-4);
+  border-top: 1px dashed var(--border);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+.relation { display: contents; }
+.relation-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  padding-top: 3px;
+}
+.relation-body { color: var(--ink); }
+.relation-body code, .relation-body a {
+  white-space: nowrap;
+}
+.relation[data-kind="blocks"]   .relation-label { color: var(--primary); }
+.relation[data-kind="depends"]  .relation-label { color: var(--moss); }
+.relation[data-kind="amended"]  .relation-label { color: var(--ochre); }
+
+/* amendment note: short "this doc was amended" header annotation */
+.amendment {
+  margin: var(--s-5) 0 0;
+  padding: 2px 0 2px var(--s-4);
+  background: transparent;
+  border-left: 2px solid var(--ochre);
+  border-radius: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--s-3);
+  align-items: baseline;
+  color: var(--ink-muted);
+}
+.amendment-label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ochre);
+  white-space: nowrap;
+}
+.amendment p { margin: 0; }
+
+/* ---------- prose ---------- */
+.doc h1, .doc h2, .doc h3, .doc h4 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  text-wrap: balance;
+  scroll-margin-top: var(--s-6);
+}
+.doc h2 {
+  font-size: 34px;
+  line-height: 1.1;
+  margin: var(--s-8) 0 var(--s-4);
+  padding-top: var(--s-5);
+  border-top: 1px solid var(--border);
+  display: flex; align-items: baseline; gap: var(--s-3);
+}
+.doc h2::before {
+  content: attr(data-num);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-faint);
+  letter-spacing: 0.05em;
+  font-weight: 500;
+  flex-shrink: 0;
+  width: 28px;
+  padding-top: 14px;
+}
+.doc h3 {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 18px;
+  letter-spacing: -0.01em;
+  margin: var(--s-6) 0 var(--s-3);
+  color: var(--ink);
+}
+.doc h4 {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-muted);
+  margin: var(--s-5) 0 var(--s-2);
+}
+.doc p {
+  margin: 0 0 var(--s-4);
+  text-wrap: pretty;
+}
+.doc p.lede {
+  font-size: 19px;
+  line-height: 1.55;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-style: italic;
+  margin-bottom: var(--s-5);
+}
+.doc a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  text-decoration-color: rgba(184, 70, 43, 0.4);
+}
+.doc a:hover { text-decoration-color: currentColor; }
+.doc strong { font-weight: 600; }
+.doc em { font-style: italic; }
+.doc ul, .doc ol { margin: 0 0 var(--s-4); padding-left: var(--s-5); }
+.doc li { margin-bottom: var(--s-2); }
+.doc li::marker { color: var(--ink-faint); }
+.doc blockquote {
+  margin: var(--s-5) 0;
+  padding: 0 0 0 var(--s-4);
+  border-left: 2px solid var(--primary);
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 19px;
+  line-height: 1.45;
+  color: var(--ink);
+}
+.doc hr {
+  border: none;
+  height: 1px;
+  background: var(--border);
+  margin: var(--s-7) 0;
+}
+
+/* leading drop-cap (optional, .doc.intro > p:first-of-type) */
+.doc .drop-cap::first-letter {
+  font-family: var(--font-display);
+  float: left;
+  font-size: 64px;
+  line-height: 0.85;
+  padding: 6px 10px 0 0;
+  color: var(--primary);
+}
+
+/* ---------- callouts ---------- */
+.callout {
+  margin: var(--s-5) 0;
+  padding: var(--s-4) var(--s-5);
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0 var(--s-3);
+  align-items: start;
+}
+.callout > .callout-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  padding: 3px 0;
+  white-space: nowrap;
+}
+.callout > .callout-body { font-size: 15.5px; line-height: 1.55; }
+.callout > .callout-body > :first-child { margin-top: 0; }
+.callout > .callout-body > :last-child  { margin-bottom: 0; }
+
+.callout[data-kind="goal"]      { background: var(--moss-soft); border-color: #B5C6BB; }
+.callout[data-kind="goal"]     .callout-label { color: var(--moss); }
+.callout[data-kind="non-goal"]  { background: var(--surface-2); }
+.callout[data-kind="non-goal"]  .callout-body { color: var(--ink-muted); }
+.callout[data-kind="question"]  { background: var(--ochre-soft); border-color: #E0C988; }
+.callout[data-kind="question"] .callout-label { color: var(--ochre); }
+.callout[data-kind="assumption"]{ background: var(--surface-1); }
+.callout[data-kind="risk"]      { background: #F4D9CF; border-color: #E0B19E; }
+.callout[data-kind="risk"]     .callout-label { color: var(--primary-hover); }
+.callout[data-kind="note"]      { background: var(--canvas); border-style: dashed; }
+.callout[data-kind="key"]       { background: var(--primary-soft); border-color: #E2B59C; }
+.callout[data-kind="key"] .callout-label { color: var(--primary-hover); }
+.callout[data-kind="caveat"]   { background: var(--surface-1); border-style: dashed; border-color: var(--border-strong); }
+.callout[data-kind="caveat"] .callout-label { color: var(--ink-muted); }
+.callout[data-kind="rationale"]{ background: var(--code-bg); border-color: var(--border); }
+.callout[data-kind="rationale"] .callout-label { color: var(--moss); }
+
+/* ---------- id-list: Goals / Non-goals / Invariants / Resolved questions ----------
+   Light "leaflet" layout: thin colored stripe + bottom divider, no per-item card. */
+.id-list {
+  list-style: none;
+  padding: 0;
+  margin: var(--s-5) 0;
+  display: grid;
+  gap: 0;
+}
+.id-list > li {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  gap: var(--s-3);
+  align-items: baseline;
+  padding: var(--s-3) 0 var(--s-3) var(--s-4);
+  background: transparent;
+  border: none;
+  border-left: 3px solid var(--border-strong);
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  font-size: 15.5px;
+  line-height: 1.55;
+  text-wrap: pretty;
+  margin: 0;
+}
+.id-list > li:last-child  { border-bottom: none; }
+.id-list > li > .id-tag {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ink-muted);
+  padding: 1px 6px;
+  border-radius: var(--r-sm);
+  background: transparent;
+  text-align: center;
+  align-self: start;
+  margin-top: 2px;
+  border: 1px solid var(--border-strong);
+}
+.id-list > li > .id-body > :first-child { margin-top: 0; }
+.id-list > li > .id-body > :last-child  { margin-bottom: 0; }
+
+.id-list[data-kind="goal"]      > li { border-left-color: var(--moss); }
+.id-list[data-kind="goal"]      > li > .id-tag { color: var(--moss); border-color: #B5C6BB; }
+.id-list[data-kind="non-goal"]  > li { border-left-color: var(--ink-faint); }
+.id-list[data-kind="non-goal"]  > li > .id-body { color: var(--ink-muted); }
+.id-list[data-kind="non-goal"]  > li > .id-tag { color: var(--ink-muted); }
+.id-list[data-kind="invariant"] > li { border-left-color: var(--primary); }
+.id-list[data-kind="invariant"] > li > .id-tag { color: var(--primary-hover); border-color: #E2B59C; }
+.id-list[data-kind="question"]  > li { border-left-color: var(--ochre); }
+.id-list[data-kind="question"]  > li > .id-tag { color: var(--ochre); border-color: #E0C988; }
+.id-list[data-kind="risk"]      > li { border-left-color: var(--primary); }
+.id-list[data-kind="risk"]      > li > .id-tag { color: var(--primary); border-color: var(--primary); }
+
+/* ---------- cross-reference (§ section refs, spec doc refs) ---------- */
+.xref {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  color: var(--moss);
+  background: var(--moss-soft);
+  padding: 1px 6px 1px 4px;
+  border-radius: var(--r-sm);
+  text-decoration: none;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.xref::before { content: "§"; margin-right: 2px; opacity: 0.7; }
+.xref.doc::before { content: "⧉"; }
+.xref:hover { border-color: var(--moss); background: var(--canvas); color: var(--moss); }
+.doc a.xref { text-decoration: none; }
+
+/* ---------- journey / scenario block ---------- */
+.journey {
+  margin: var(--s-5) 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--canvas);
+  overflow: hidden;
+}
+.journey-head {
+  padding: var(--s-3) var(--s-5);
+  background: transparent;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+}
+.journey-id {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  color: var(--primary);
+  background: transparent;
+  border: 1px solid var(--primary-soft);
+  padding: 2px 7px;
+  border-radius: var(--r-sm);
+}
+.journey-title {
+  font-family: var(--font-display) !important;
+  font-size: 20px;
+  line-height: 1.2;
+  margin: 0;
+  flex: 1;
+  font-weight: 400;
+  letter-spacing: -0.015em;
+}
+.journey-body { padding: var(--s-4) var(--s-5) var(--s-3); display: grid; gap: var(--s-4); }
+.journey-body > section { display: grid; gap: var(--s-2); }
+.journey-body > section > h4 {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  font-weight: 500;
+  margin: 0;
+}
+.journey-body ul, .journey-body ol {
+  margin: 0;
+  padding-left: var(--s-5);
+  font-size: 14.5px;
+  line-height: 1.55;
+}
+.journey-body ul li { margin-bottom: var(--s-1); }
+
+/* Steps: position-based, NOT grid (so inline <code> stays inline) */
+.journey-steps {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  counter-reset: step;
+}
+.journey-steps li {
+  position: relative;
+  counter-increment: step;
+  padding: var(--s-2) 0 var(--s-2) 32px;
+  border-bottom: 1px dashed var(--border);
+  margin: 0;
+  display: block;
+  font-size: 14.5px;
+  line-height: 1.55;
+}
+.journey-steps li:last-child { border-bottom: none; }
+.journey-steps li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: var(--s-2);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-faint);
+  background: var(--surface-1);
+  border-radius: 50%;
+  width: 20px; height: 20px;
+  display: grid; place-items: center;
+  border: 1px solid var(--border);
+}
+
+/* ---------- prompt stack (visual blocks in registration/composition order) ---------- */
+.prompt-stack {
+  list-style: none;
+  padding: 0;
+  margin: var(--s-5) 0;
+  display: grid;
+  gap: 4px;
+  font-family: var(--font-mono);
+}
+.prompt-stack > li {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: var(--s-3);
+  align-items: center;
+  background: var(--canvas);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--primary);
+  border-radius: var(--r-sm);
+  padding: var(--s-3) var(--s-4);
+  font-size: 13.5px;
+  margin: 0;
+}
+.prompt-stack > li > .stack-tag {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  color: var(--primary);
+  text-transform: uppercase;
+}
+.prompt-stack > li > .stack-tag::before { content: "<"; opacity: 0.5; }
+.prompt-stack > li > .stack-tag::after  { content: ">"; opacity: 0.5; }
+.prompt-stack > li > .stack-body { color: var(--ink); font-family: var(--font-body); font-size: 14px; line-height: 1.45; }
+.prompt-stack > li > .stack-body em { color: var(--ink-muted); font-style: italic; }
+.prompt-stack > li[data-state="deferred"] { opacity: 0.55; border-left-color: var(--ink-faint); border-left-style: dashed; }
+.prompt-stack > li[data-state="deferred"] > .stack-tag { color: var(--ink-faint); }
+.prompt-stack > li[data-state="first"]    { border-left-color: var(--ochre); }
+.prompt-stack > li[data-state="first"] > .stack-tag { color: var(--ochre); }
+
+/* margin annotation (small note alongside paragraphs on wide screens) */
+.margin-note {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 15px;
+  color: var(--ink-muted);
+  border-left: 1px solid var(--border-strong);
+  padding-left: var(--s-3);
+  margin: var(--s-3) 0;
+}
+@media (min-width: 1400px) {
+  .margin-note {
+    float: right;
+    clear: right;
+    width: 200px;
+    margin: 0 calc(-220px) var(--s-3) var(--s-4);
+    border-left: none;
+    padding-left: 0;
+    border-top: 1px solid var(--border-strong);
+    padding-top: var(--s-2);
+  }
+}
+
+/* ---------- tables ---------- */
+.doc table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: var(--s-5) 0;
+  font-size: 14.5px;
+}
+.doc thead th {
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  padding: var(--s-2) var(--s-3);
+  border-bottom: 1px solid var(--border-strong);
+  background: transparent;
+}
+.doc tbody td {
+  padding: var(--s-3);
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.doc tbody tr:hover td { background: rgba(214, 207, 190, 0.18); }
+.doc table.compact tbody td { padding: var(--s-2) var(--s-3); }
+
+/* risks table */
+.risks td.severity[data-sev="low"]    { color: var(--moss); font-weight: 500; }
+.risks td.severity[data-sev="med"]    { color: var(--ochre); font-weight: 500; }
+.risks td.severity[data-sev="high"]   { color: var(--primary); font-weight: 600; }
+
+/* ---------- decision log ---------- */
+.decision {
+  margin: var(--s-5) 0;
+  padding: var(--s-5);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--canvas);
+  position: relative;
+}
+.decision-head {
+  display: flex; align-items: baseline;
+  gap: var(--s-3);
+  margin-bottom: var(--s-3);
+  flex-wrap: wrap;
+}
+.decision-id {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-faint);
+  letter-spacing: 0.05em;
+}
+.decision-title {
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 1.15;
+  margin: 0;
+  flex: 1;
+}
+.decision-meta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--s-2) var(--s-4);
+  font-size: 13.5px;
+  margin-top: var(--s-3);
+  padding-top: var(--s-3);
+  border-top: 1px dashed var(--border);
+}
+.decision-meta dt {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.decision-meta dd { margin: 0; }
+
+/* ---------- task list ---------- */
+.tasks {
+  list-style: none;
+  padding: 0;
+  margin: var(--s-5) 0;
+  border-top: 1px solid var(--border);
+}
+.tasks li {
+  display: grid;
+  grid-template-columns: 24px 1fr auto auto;
+  gap: var(--s-3);
+  align-items: center;
+  padding: var(--s-3) 0;
+  border-bottom: 1px solid var(--border);
+  margin: 0;
+  font-size: 15px;
+}
+.tasks .task-check {
+  width: 18px; height: 18px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  background: var(--canvas);
+  cursor: pointer;
+  display: grid; place-items: center;
+  transition: background 120ms, border-color 120ms;
+}
+.tasks .task-check:hover { border-color: var(--ink-muted); }
+.tasks .task-check::after {
+  content: ""; width: 10px; height: 10px;
+  border-radius: 2px;
+  background: var(--primary);
+  transform: scale(0);
+  transition: transform 120ms;
+}
+.tasks li[data-status="done"] .task-check { border-color: var(--primary); }
+.tasks li[data-status="done"] .task-check::after { transform: scale(1); }
+.tasks li[data-status="done"] .task-text { color: var(--ink-muted); text-decoration: line-through; text-decoration-color: var(--border-strong); }
+.tasks li[data-status="doing"] .task-check { border-color: var(--ochre); }
+.tasks li[data-status="doing"] .task-check::after { background: var(--ochre); transform: scale(1); border-radius: 50%; }
+.tasks li[data-status="blocked"] .task-check { border-color: #B83A1E; background: #F4D9CF; }
+.tasks li[data-status="blocked"] .task-check::after { content: "✕"; width: auto; height: auto; background: none; color: #B83A1E; font-size: 12px; transform: scale(1); }
+.tasks .task-owner {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--ink-muted);
+}
+.tasks .task-est {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--ink-faint);
+  background: var(--surface-1);
+  padding: 1px 8px;
+  border-radius: var(--r-pill);
+}
+
+/* ---------- changeset / file tree ---------- */
+.changeset {
+  margin: var(--s-5) 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--canvas);
+  overflow: hidden;
+}
+.changeset-head {
+  display: flex; align-items: center;
+  padding: var(--s-2) var(--s-4);
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+.changeset-head .counts { margin-left: auto; display: flex; gap: var(--s-3); }
+.changeset-head .counts .add  { color: var(--moss); }
+.changeset-head .counts .mod  { color: var(--ochre); }
+.changeset-head .counts .del  { color: var(--primary); }
+.changeset ul.tree {
+  list-style: none;
+  padding: var(--s-3) var(--s-4);
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+.changeset ul.tree li {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 2px 0;
+  margin: 0;
+}
+.changeset ul.tree li .op {
+  width: 14px;
+  text-align: center;
+  font-weight: 600;
+}
+.changeset ul.tree li[data-op="add"] .op { color: var(--moss); }
+.changeset ul.tree li[data-op="mod"] .op { color: var(--ochre); }
+.changeset ul.tree li[data-op="del"] .op { color: var(--primary); }
+.changeset ul.tree li[data-op="del"] .path { text-decoration: line-through; color: var(--ink-muted); }
+.changeset ul.tree li .note { color: var(--ink-faint); font-size: 12px; margin-left: var(--s-2); }
+
+/* ---------- code ---------- */
+.code-block {
+  margin: var(--s-5) 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--code-bg);
+  overflow: hidden;
+}
+.code-block.compact { background: var(--code-bg); }
+.code-block.compact > .code-head { display: none; }
+.code-head {
+  display: flex; align-items: center;
+  padding: var(--s-2) var(--s-4);
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+.code-head .filename { color: var(--ink); }
+.code-head .lang { margin-left: var(--s-3); color: var(--ink-faint); }
+.code-head .copy { margin-left: auto; }
+.code-block pre {
+  margin: 0;
+  padding: var(--s-4);
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink);
+}
+.code-block pre code { font-family: inherit; }
+:not(pre) > code {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  background: var(--code-bg);
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: none;
+  color: var(--ink);
+}
+
+/* Prism theme overrides */
+.token.comment, .token.prolog, .token.doctype, .token.cdata { color: var(--ink-faint); font-style: italic; }
+.token.punctuation { color: var(--ink-muted); }
+.token.property, .token.tag, .token.boolean, .token.number, .token.constant, .token.symbol { color: var(--primary); }
+.token.selector, .token.attr-name, .token.string, .token.char, .token.builtin { color: var(--moss); }
+.token.operator, .token.entity, .token.url, .language-css .token.string, .style .token.string { color: var(--ochre); }
+.token.atrule, .token.attr-value, .token.keyword { color: var(--primary-hover); font-weight: 500; }
+.token.function, .token.class-name { color: var(--primary-hover); }
+.token.regex, .token.important, .token.variable { color: var(--ochre); }
+
+/* ---------- diff blocks ---------- */
+.diff {
+  margin: var(--s-5) 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+.diff > summary {
+  padding: var(--s-2) var(--s-4);
+  background: var(--surface-1);
+  cursor: pointer;
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+.diff > .diff-body { background: var(--code-bg); padding: var(--s-3) 0; }
+.diff .line { padding: 1px var(--s-4); white-space: pre; }
+.diff .line.add { background: rgba(61, 90, 76, 0.12); color: var(--moss); }
+.diff .line.add::before  { content: "+ "; opacity: 0.6; }
+.diff .line.del { background: rgba(184, 70, 43, 0.12); color: var(--primary); }
+.diff .line.del::before  { content: "− "; opacity: 0.6; }
+.diff .line.ctx { color: var(--ink-muted); }
+.diff .line.ctx::before  { content: "  "; }
+
+/* ---------- diagrams ---------- */
+.diagram {
+  margin: var(--s-6) 0;
+  padding: var(--s-5);
+  background: var(--canvas);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow-x: auto;
+  display: grid;
+  place-items: center;
+}
+.diagram .caption,
+.figure-caption {
+  display: block;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 14px;
+  color: var(--ink-muted);
+  margin-top: var(--s-3);
+  text-align: center;
+}
+.figure {
+  margin: var(--s-6) 0;
+}
+.figure > * { display: block; margin: 0 auto; }
+
+/* mermaid surface */
+.mermaid {
+  font-family: var(--font-body) !important;
+}
+
+/* ASCII / monospace box diagrams */
+pre.ascii {
+  background: var(--canvas);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--s-4) var(--s-5);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--ink);
+  overflow-x: auto;
+}
+
+/* svg helper class: for hand-authored inline SVG illustrations */
+svg.illus {
+  --stroke: var(--ink);
+  --fill:   var(--canvas);
+  --accent: var(--primary);
+  --muted:  var(--ink-muted);
+  max-width: 100%;
+  height: auto;
+}
+svg.illus .stroke   { stroke: var(--stroke); fill: none; stroke-width: 1.25; }
+svg.illus .stroke-2 { stroke: var(--stroke); fill: none; stroke-width: 2; }
+svg.illus .fill     { fill: var(--fill); stroke: var(--stroke); stroke-width: 1.25; }
+svg.illus .accent   { stroke: var(--accent); fill: none; stroke-width: 2; }
+svg.illus .accent-f { fill: var(--accent); stroke: none; }
+svg.illus .muted    { stroke: var(--muted); fill: none; stroke-width: 1; stroke-dasharray: 3 3; }
+svg.illus text      { font-family: var(--font-mono); font-size: 11px; fill: var(--ink); }
+svg.illus text.label{ font-family: var(--font-display); font-style: italic; font-size: 14px; fill: var(--ink); }
+
+/* spark: tiny inline charts */
+.spark { display: inline-block; vertical-align: middle; height: 18px; }
+.spark path { fill: none; stroke: var(--primary); stroke-width: 1.5; }
+
+/* ---------- swimlane / phases ---------- */
+.phases {
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 5), 1fr);
+  gap: var(--s-3);
+  margin: var(--s-5) 0;
+}
+.phase {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--s-3) var(--s-4);
+  background: var(--canvas);
+  position: relative;
+}
+.phase .phase-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin-bottom: var(--s-2);
+}
+.phase .phase-title {
+  font-family: var(--font-display);
+  font-size: 18px;
+  line-height: 1.15;
+  margin: 0 0 var(--s-2);
+}
+.phase ul { padding-left: var(--s-4); margin: var(--s-2) 0 0; font-size: 13.5px; }
+.phase[data-state="done"]    { background: var(--moss-soft); }
+.phase[data-state="active"]  { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary) inset; }
+.phase[data-state="future"]  { opacity: 0.7; }
+
+/* ---------- matrix (2x2) ---------- */
+.matrix {
+  display: grid;
+  grid-template-columns: 100px 1fr 1fr;
+  grid-template-rows: 40px 1fr 1fr;
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  margin: var(--s-5) 0;
+  min-height: 320px;
+}
+.matrix > * { background: var(--canvas); padding: var(--s-3); }
+.matrix .axis-y, .matrix .axis-x {
+  display: grid; place-items: center;
+  font-family: var(--font-mono); font-size: 11px;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--ink-muted);
+  background: var(--surface-1);
+}
+.matrix .cell {
+  font-size: 13.5px;
+  display: flex; flex-direction: column; gap: var(--s-2);
+  position: relative;
+}
+.matrix .cell .cell-label {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--ink-faint);
+}
+
+/* ---------- right rail TOC ---------- */
+.rail {
+  position: sticky;
+  top: var(--s-5);
+  align-self: start;
+  font-size: 13px;
+  max-height: calc(100vh - var(--s-7));
+  overflow-y: auto;
+  padding-left: var(--s-4);
+  border-left: 1px solid var(--border);
+}
+.rail h5 {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 0 0 var(--s-3);
+}
+.rail ol {
+  list-style: none;
+  padding: 0; margin: 0;
+  counter-reset: toc;
+}
+.rail ol li {
+  counter-increment: toc;
+  margin-bottom: var(--s-2);
+  line-height: 1.35;
+}
+.rail ol li a {
+  color: var(--ink-muted);
+  text-decoration: none;
+  display: flex;
+  gap: var(--s-2);
+  padding: 2px 6px 2px 0;
+  border-radius: 3px;
+}
+.rail ol li a::before {
+  content: counter(toc, decimal-leading-zero);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-faint);
+  padding-top: 2px;
+  flex-shrink: 0;
+}
+.rail ol li a:hover { color: var(--ink); }
+.rail ol li a.active { color: var(--primary); font-weight: 500; }
+
+.rail ol .rail-sub {
+  list-style: none;
+  counter-reset: none;
+  padding-left: var(--s-5);
+  margin: var(--s-1) 0 var(--s-2);
+  border-left: 1px solid var(--border);
+}
+.rail ol .rail-sub li {
+  counter-increment: none;
+  margin-bottom: 2px;
+}
+.rail ol .rail-sub li a::before { content: ""; padding: 0; }
+.rail ol .rail-sub li a {
+  font-size: 12px;
+  color: var(--ink-faint);
+  padding: 1px 6px 1px 0;
+}
+
+.rail .rail-progress {
+  margin: var(--s-5) 0 var(--s-3);
+  height: 2px; background: var(--border);
+  border-radius: 2px; overflow: hidden;
+}
+.rail .rail-progress div { height: 100%; background: var(--primary); width: 0%; transition: width 120ms; }
+
+/* ---------- editable affordances ---------- */
+[contenteditable="true"] {
+  outline: none;
+  border-radius: 3px;
+  transition: background 80ms, box-shadow 80ms;
+}
+[contenteditable="true"]:hover {
+  background: rgba(184, 70, 43, 0.04);
+}
+[contenteditable="true"]:focus {
+  background: rgba(184, 70, 43, 0.06);
+  box-shadow: 0 0 0 2px rgba(184, 70, 43, 0.18);
+}
+body.edit-off [contenteditable="true"] {
+  cursor: default;
+  background: none !important;
+  box-shadow: none !important;
+}
+body.edit-off [data-edit-only] { display: none !important; }
+
+/* edit chips next to status / task elements */
+.status[data-editable], .tasks li[data-editable] .task-check {
+  cursor: pointer;
+}
+
+/* ---------- collapsible sections ---------- */
+.doc section.collapsible > h2 { cursor: pointer; }
+.doc section.collapsible > h2::after {
+  content: "▾";
+  margin-left: auto;
+  color: var(--ink-faint);
+  font-size: 14px;
+  transition: transform 120ms;
+}
+.doc section.collapsible.collapsed > *:not(h2) { display: none; }
+.doc section.collapsible.collapsed > h2::after { transform: rotate(-90deg); }
+
+/* ---------- footer ---------- */
+.doc-footer {
+  margin-top: var(--s-9);
+  padding-top: var(--s-5);
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--ink-faint);
+  display: flex;
+  gap: var(--s-5);
+  flex-wrap: wrap;
+}
+
+/* ---------- toasts ---------- */
+.toast-host {
+  position: fixed; bottom: var(--s-5); right: var(--s-5);
+  display: flex; flex-direction: column; gap: var(--s-2);
+  z-index: 10000;
+  pointer-events: none;
+}
+.toast {
+  background: var(--ink);
+  color: var(--canvas);
+  padding: 8px 14px;
+  border-radius: var(--r-md);
+  font-size: 13px;
+  box-shadow: var(--shadow-elevated);
+  animation: toastIn 240ms cubic-bezier(.2,.7,.2,1);
+}
+@keyframes toastIn {
+  from { transform: translateY(8px); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+
+/* ---------- focus, accessibility, motion ---------- */
+:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ---------- print ---------- */
+@media print {
+  body { background: white; font-size: 11pt; }
+  .topbar, .rail, .toast-host, .btn, [data-edit-only] { display: none !important; }
+  .page { display: block; padding: 0; }
+  .doc { max-width: 6.5in; margin: 0 auto; }
+  .doc h2 { page-break-after: avoid; border-top-color: #ddd; }
+  .doc h2::before { color: #999; }
+  .callout, .decision, .diagram, .code-block, .changeset {
+    page-break-inside: avoid;
+    box-shadow: none !important;
+    border-color: #ccc !important;
+  }
+  a { color: var(--primary) !important; text-decoration: none; }
+  a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-family: var(--font-mono);
+    font-size: 9pt;
+    color: #666;
+  }
+  .doc-title { font-size: 28pt; }
+}
+
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+</head>
+<body>
+
+<div class="page">
+
+  <header class="topbar">
+    <div class="crumbs">
+      <a href="../index.html">plans</a>
+      <span class="sep">/</span>
+      <span>specs</span>
+      <span class="sep">/</span>
+      <span>2026-05-15-skills-and-tools-design</span>
+    </div>
+    <div class="spacer"></div>
+    <div class="btn-row">
+      <button class="btn ghost"   data-action="toggle-edit">Edit · on</button>
+      <button class="btn ghost"   data-action="print">Print</button>
+      <div class="btn-menu-wrap" data-menu>
+        <button class="btn ghost" data-menu-toggle>Copy</button>
+        <div class="btn-menu">
+          <button type="button" data-action="copy-diff">
+            <span class="menu-label">Copy diff</span>
+            <span class="menu-hint">working iteration · paste back to claude code</span>
+          </button>
+          <button type="button" data-action="copy-md">
+            <span class="menu-label">Copy markdown</span>
+            <span class="menu-hint">finalize · yaml frontmatter + body</span>
+          </button>
+        </div>
+      </div>
+      <button class="btn"         data-action="export-html">Download</button>
+      <button class="btn ghost"   data-action="reset-edits" title="Discard browser edits">Reset</button>
+    </div>
+  </header>
+
+<article class="doc">
+
+  <header class="doc-header">
+    <div class="doc-eyebrow">
+      <span class="dot"></span>
+      <span>Spec · Phase 2</span>
+      <span class="status" data-status="draft" data-editable></span>
+    </div>
+    <h1 class="doc-title">Skills and Tools <em>subsystem</em></h1>
+    <p class="doc-summary">Lands three architecture seams together: <code>ToolCapability</code> (tool-result handling + <code>trust_class</code>/<code>side_effect_class</code> metadata), the <code>SkillRegistry</code> and <code>Skill</code> tool (Agent Skills progressive disclosure), and the persona/core-blocks split of the Instructions composer: because they form a dependency chain that cannot ship independently.</p>
+    <dl class="doc-meta">
+      <div><dt>Date</dt><dd>2026-05-15</dd></div>
+      <div><dt>Phase</dt><dd>2</dd></div>
+      <div><dt>Tags</dt><dd class="tags"><span class="tag">scaffold</span><span class="tag">capabilities</span><span class="tag">skills</span><span class="tag">instructions</span></dd></div>
+    </dl>
+    <div class="relations">
+      <div class="relation" data-kind="depends">
+        <span class="relation-label">Depends on</span>
+        <div class="relation-body"><a class="xref doc" href="#">docs/architecture.md</a> (<a class="xref" href="#">ToolCapability</a>, <a class="xref" href="#">SkillRegistry &amp; Skill tool</a>, <a class="xref" href="#">Instructions composer</a>, <a class="xref" href="#">AgentConfig</a>, <a class="xref" href="#">Anti-revert content-hash discipline</a>); root <a class="xref doc" href="#">CLAUDE.md</a> ("Instructions" vs "system_prompt" naming); the <a href="https://agentskills.io/specification">Agent Skills standard</a></div>
+      </div>
+      <div class="relation" data-kind="blocks">
+        <span class="relation-label">Blocks</span>
+        <div class="relation-body">the skills-and-tools implementation plan; a future <code>MemoryStore</code> spec (memory tools depend on the tool-metadata convention introduced here)</div>
+      </div>
+    </div>
+  </header>
+
+  <aside class="amendment">
+    <span class="amendment-label">Amended 2026-05-18</span>
+    <p>Post-implementation spec-review corrections (I4 / <a class="xref" href="#">Registration order</a> hash-scope, Q4 Letta context, catalog truncation contract, and four added rationales); see the 2026-05-18 changelog entry in <a class="xref doc" href="#">docs/architecture.md</a>.</p>
+  </aside>
+
+  <section>
+    <h2>Context</h2>
+    <p class="lede">Three seams in the architecture have always pointed at each other: touching any one drags the other two along.</p>
+    <p>The scaffold carries three architecture seams that are documented in <a class="xref doc" href="#">docs/architecture.md</a> but unimplemented in code: <code>ToolCapability</code> (tool-result handling plus the <code>trust_class</code>/<code>side_effect_class</code> metadata convention), the <code>SkillRegistry</code> and <code>Skill</code> tool (open Agent Skills progressive disclosure), and the persona/core-blocks split of the Instructions composer. <code>tools.py</code> holds empty stubs; the Instructions composer exists and is wired (<code>core_agent.instructions(compose_instructions)</code>) but has zero registered contributors.</p>
+    <p>These three seams cannot land independently: they form a dependency chain. Skills register <em>as tools</em>, so they require the tool-metadata convention. The skills catalog is an Instructions contributor, so it requires the composer to actually own all Instructions content. Today it does not: <code>config.instruction_text</code> reaches the model through Pydantic AI's static <code>instructions=</code> parameter, which bypasses the composer entirely. The composer captures only contributor output into <code>RunState.captured_instructions</code>, so as long as <code>instruction_text</code> rides the static slot, <code>Run.instructions</code> is incomplete: it is currently the empty string while the model actually receives <code>instruction_text</code>, a violation of the architecture invariant that <code>Run.instructions</code> is "what the model actually saw." Adding the catalog as a contributor while leaving <code>instruction_text</code> static would only widen that gap.</p>
+    <div class="callout" data-kind="key">
+      <span class="callout-label">Why one slice</span>
+      <div class="callout-body"><p>This spec defines the slice that lands all three together, with the Instructions-composer migration as a first-class part of the work rather than a side prerequisite.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Goals</h2>
+    <ol class="id-list" data-kind="goal">
+      <li id="G1"><span class="id-tag">G1</span><div class="id-body"><code>ToolCapability</code>, a Pydantic AI <code>AbstractCapability</code>, reads <code>trust_class</code> and <code>side_effect_class</code> from each tool's <code>ToolDefinition.metadata</code> and acts on them at the <code>before_tool_execute</code> and <code>after_tool_execute</code> boundaries: verified by unit tests over both branches of each field.</div></li>
+      <li id="G2"><span class="id-tag">G2</span><div class="id-body">Every registered function tool declares both metadata fields at definition time; a tool missing either field causes a fail-fast error at agent construction, verified by a test that registers an under-specified tool and asserts the error.</div></li>
+      <li id="G3"><span class="id-tag">G3</span><div class="id-body"><code>SkillRegistry</code> discovers <code>SKILL.md</code> files under the project and user skill directories, parses their frontmatter, and renders a catalog string: verified by a test fixture tree containing valid skills, a name collision, and a malformed file.</div></li>
+      <li id="G4"><span class="id-tag">G4</span><div class="id-body">A <code>Skill(name)</code> tool, with <code>name</code> constrained to an enum of discovered skill names, is registered when at least one skill is discovered and absent otherwise; invoking it returns the frontmatter-stripped, structurally-wrapped skill body as a tool result.</div></li>
+      <li id="G5"><span class="id-tag">G5</span><div class="id-body"><code>AgentConfig.instruction_text</code> is replaced by <code>instructions_frame_text</code> and <code>persona_text</code>; both are registered as Instructions contributors; the static <code>instructions=</code> slot is unused; <code>Run.instructions</code> equals the full composed string the model received, verified by an assertion over a completed <code>Run</code>.</div></li>
+      <li id="G6"><span class="id-tag">G6</span><div class="id-body">Each Instructions contributor emits at most one XML-delimited block: an empty contributor (e.g. the skills catalog with no skills discovered) contributes nothing and is skipped: and the scaffold-frame block is registered first, verified by a test asserting the frame block leads and that every non-empty block carries its named tag.</div></li>
+      <li id="G7"><span class="id-tag">G7</span><div class="id-body">The <code>&lt;untrusted_content&gt;</code> wrapping path is exercised by a test-only untrusted tool fixture, verified by asserting the wrapper markers appear in the result the model receives.</div></li>
+      <li id="G8"><span class="id-tag">G8</span><div class="id-body">An anti-revert content-hash test pins the default <code>instructions_frame_text</code>, consistent with <a class="xref" href="#">Anti-revert content-hash discipline</a>.</div></li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>Non-goals</h2>
+    <ol class="id-list" data-kind="non-goal">
+      <li id="NG1"><span class="id-tag">NG1</span><div class="id-body">The human-in-the-loop approval queue: at L1 the side-effect gate auto-approves (a no-op pass-through). The seam exists; the queue is deferred to L3 per <a class="xref doc" href="#">docs/architecture.md</a> <a class="xref" href="#">ToolCapability</a>.</div></li>
+      <li id="NG2"><span class="id-tag">NG2</span><div class="id-body">Tier-3 skill resources (<code>scripts/</code>, <code>references/</code>, <code>assets/</code> directories inside a skill). This slice implements catalog (tier 1) and body (tier 2) only: deferred to a later skills spec.</div></li>
+      <li id="NG3"><span class="id-tag">NG3</span><div class="id-body"><code>MemoryStore</code> and memory tools: a neighboring deferred subsystem. This spec leaves the memory-index contributor slot vacant (it registers after persona when that subsystem lands).</div></li>
+      <li id="NG4"><span class="id-tag">NG4</span><div class="id-body">The end-of-run tool-pair lifecycle classifier: skill activations remain ordinary tool-call/tool-return pairs in <code>messages[]</code> carried by normal history persistence. Deferred; revisited only on trace evidence.</div></li>
+      <li id="NG5"><span class="id-tag">NG5</span><div class="id-body">Non-skill function tools: <code>Skill</code> is the only function tool authored in this slice. The metadata convention is the seam future tools follow; retrofitting is what it deliberately avoids.</div></li>
+      <li id="NG6"><span class="id-tag">NG6</span><div class="id-body">Source-grounding / provenance metadata on tool results: <code>ToolCapability</code>'s documented "(later)" third concern. Deferred.</div></li>
+      <li id="NG7"><span class="id-tag">NG7</span><div class="id-body"><code>IdentityProvisioner</code>: a separate unrelated seam; not touched here.</div></li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>Design</h2>
+
+    <h3 id="design-toolcapability"><code>ToolCapability</code></h3>
+    <p>An <code>AbstractCapability</code> subclass registered on the core agent via <code>Agent(capabilities=[…])</code>, alongside the existing <code>Hooks</code> capability. It is the single convergence point for side-effect gating and prompt-injection defense.</p>
+    <ul>
+      <li><strong><code>before_tool_execute</code></strong>: reads <code>side_effect_class</code> from <code>tool_def.metadata</code>. <code>read</code> and <code>write</code> tools pass through unchanged. <code>external</code> and <code>irreversible</code> tools route through the gate. At L1 the gate auto-approves: it returns the validated args unchanged and is observable as a no-op. The gate is a named, exercised code path so that L3 can swap in an approval queue without re-shaping callers.</li>
+      <li><strong><code>after_tool_execute</code></strong>: reads <code>trust_class</code> from <code>tool_def.metadata</code>. A <code>trusted</code> result passes through unchanged. An <code>untrusted</code> result is wrapped in <code>&lt;untrusted_content&gt;</code> … <code>&lt;/untrusted_content&gt;</code> markers before it returns to the model.</li>
+    </ul>
+
+    <div class="callout" data-kind="key">
+      <span class="callout-label">Authoring convention</span>
+      <div class="callout-body">
+        <p>Every registered function tool declares two fields on its <code>ToolDefinition.metadata</code> dict at definition time:</p>
+        <ul>
+          <li><code>trust_class: "trusted" | "untrusted"</code>: whether the tool's returned content may carry injected instructions.</li>
+          <li><code>side_effect_class: "read" | "write" | "external" | "irreversible"</code>: <code>read</code>/<code>write</code> auto-execute; <code>external</code>/<code>irreversible</code> route through the gate.</li>
+        </ul>
+        <p>Both fields are required. A tool that registers without both is a configuration error surfaced as early as possible: at agent construction, not at first tool call. <strong>Fail-fast is deliberate:</strong> a silently un-classified tool is a security hole, not a degraded feature.</p>
+      </div>
+    </div>
+
+    <p>This convention depends on Pydantic AI surfacing the metadata where the capability needs it: <code>Tool.metadata</code> is readable at agent construction (the fail-fast check) and <code>ToolDefinition.metadata</code> is readable inside the <code>before_tool_execute</code> / <code>after_tool_execute</code> hooks (gating and wrapping): see <a class="xref doc" href="#">docs/pydantic-ai/hooks-reference.md</a>.</p>
+
+    <h3 id="design-skillregistry"><code>SkillRegistry</code></h3>
+    <p>A startup-time discovery component holding an in-memory registry of skill records.</p>
+    <ul>
+      <li><strong>Discovery</strong>: scans <code>&lt;project&gt;/.agents/skills/*/SKILL.md</code> then <code>~/.agents/skills/*/SKILL.md</code>. On a name collision the project-scoped skill wins; the registry warns and continues rather than failing. <code>.claude/skills/</code> paths are intentionally not scanned: they hold skills for the <em>development</em> agent building this project, not for the <em>runtime</em> agent the scaffold ships: scanning them would leak the builder's tooling into the product agent's catalog.</li>
+      <li><strong>Frontmatter contract</strong>: each <code>SKILL.md</code> carries YAML frontmatter. Required: <code>name</code> (≤64 chars, lowercase letters and hyphens, matching the parent directory name) and <code>description</code> (≤1024 chars). Optional fields (<code>license</code>, <code>compatibility</code>, <code>metadata</code>, <code>allowed-tools</code>) are tolerated and ignored in this slice. Parsing uses a lenient fallback so a minor frontmatter defect degrades one skill rather than aborting discovery; a skill whose required fields cannot be resolved is skipped with a warning.</li>
+      <li><strong>Skill record</strong>: <code>name</code>, <code>description</code>, and filesystem <code>location</code>. The skill <em>body</em> is not part of the record's contract: it reaches the model only through the <code>Skill(name)</code> tool result, never through the composed instructions. <code>Run.instructions</code> completeness: invariant <a href="#I2">I2</a>: is therefore independent of whether bodies are read eagerly at discovery or lazily on activation. Either is acceptable; the choice is the implementer's, as bodies are small.</li>
+    </ul>
+
+    <p>A skill record looks like:</p>
+    <div class="code-block">
+      <div class="code-head"><span class="filename">scaffold/skills/registry.py</span><span class="lang">python</span></div>
+<pre><code class="language-python">@dataclass(frozen=True)
+class SkillRecord:
+    name: str          # validated: ≤64 chars, lowercase + hyphens, matches parent dir
+    description: str   # validated: ≤1024 chars
+    location: Path     # the SKILL.md file path
+</code></pre>
+    </div>
+
+    <h3 id="design-skill-tool"><code>Skill</code> tool</h3>
+    <ul>
+      <li>Registered on the core agent <strong>only when at least one skill is discovered</strong>: an enum with zero members is not a valid parameter type, and a no-op tool is noise in the model's tool list.</li>
+      <li>The <code>name</code> parameter is constrained to an enum of discovered skill names. This prevents the model from hallucinating an activation for a skill that does not exist.</li>
+      <li>Invoking <code>Skill(name)</code> returns the skill's body with YAML frontmatter stripped, structurally wrapped, as a <code>tool_result</code>: the dedicated-tool activation pattern from the Agent Skills standard, chosen over raw file-read so frontmatter stripping and structural wrapping are guaranteed. The wrapper delimits the activated skill content with a named marker:</li>
+    </ul>
+
+    <div class="code-block compact">
+      <div class="code-head"></div>
+<pre><code class="language-xml">&lt;skill name="pdf-processing"&gt;
+…frontmatter-stripped body…
+&lt;/skill&gt;</code></pre>
+    </div>
+
+    <p>This is a structural marker (it tells the model where the skill body begins and ends); it is distinct from the <code>&lt;untrusted_content&gt;</code> marker, which is the injection-defense convention for <code>untrusted</code> results. Skill bodies are <code>trusted</code>.</p>
+    <p>Metadata: <code>trust_class="trusted"</code> (the body comes from our own filesystem) and <code>side_effect_class="read"</code>.</p>
+
+    <h3 id="design-instructions">Instructions contributors and the composer migration</h3>
+    <p><code>AgentConfig.instruction_text</code> is replaced by two fields:</p>
+    <div class="code-block">
+      <div class="code-head"><span class="filename">scaffold/config.py</span><span class="lang">python</span></div>
+<pre><code class="language-python">class AgentConfig(BaseModel):
+    instructions_frame_text: str   # scaffold role contract + output discipline; scaffold default, config-overridable
+    persona_text: str              # who the agent IS: name, voice, character; deployment-owned, scaffold default
+    # … existing fields unchanged …
+</code></pre>
+    </div>
+
+    <p><strong>Contributor shape.</strong> Every Instructions contributor is a <code>(ctx) -&gt; str</code> callable registered with the composer. Each contributor's output is one <strong>XML-delimited block</strong>: a named tag wrapping a markdown body, so the model locates a section by its tag rather than by its position.</p>
+
+    <div class="code-block compact">
+      <div class="code-head"></div>
+<pre><code class="language-xml">&lt;ROLE&gt;
+You are a **master** software engineer. …
+&lt;/ROLE&gt;</code></pre>
+    </div>
+
+    <p>Two helpers keep this uniform:</p>
+    <ul>
+      <li><code>wrap(tag, text)</code>: a pure formatting primitive producing <code>&lt;TAG&gt;\n{text}\n&lt;/TAG&gt;</code>. Every contributor calls it; it owns no state and takes no <code>ctx</code>.</li>
+      <li><code>static_block(tag, text)</code>: a thin closure factory for blocks whose text is a literal; it returns a <code>(ctx) -&gt; wrap(tag, text)</code> contributor. Used for the frame and persona blocks.</li>
+    </ul>
+
+    <p>A contributor is a hand-written function only when its text is <em>computed</em>. The skills catalog is the one such contributor in this slice; the future memory index is another. Frame and persona are not bespoke functions: they are two <code>static_block(...)</code> calls.</p>
+
+    <h4>The composed stack</h4>
+
+    <ol class="prompt-stack">
+      <li data-state="first">
+        <span class="stack-tag">ROLE</span>
+        <span class="stack-body"><strong>Frame</strong>: scaffold role contract + output discipline. <em>Scaffold-owned, config-overridable. Names the <code>Skill</code> tool and <code>&lt;untrusted_content&gt;</code> conventions.</em></span>
+      </li>
+      <li>
+        <span class="stack-tag">PERSONA</span>
+        <span class="stack-body"><strong>Persona</strong>: who the agent is. <em>Deployment-owned. Becomes a computed contributor reading <code>MemoryStore.core_blocks()</code> when memory lands.</em></span>
+      </li>
+      <li data-state="deferred">
+        <span class="stack-tag">MEMORY</span>
+        <span class="stack-body"><strong>Memory index</strong>: <em>deferred (NG3). Slot reserved.</em></span>
+      </li>
+      <li>
+        <span class="stack-tag">SKILLS</span>
+        <span class="stack-body"><strong>Skills catalog</strong>: one entry per discovered skill. <em>Computed. Empty contributor when no skills discovered; composer skips empty blocks without a stray separator.</em></span>
+      </li>
+    </ol>
+
+    <p><strong>The three contributors <code>create_agent()</code> registers:</strong></p>
+    <ol>
+      <li><strong>Frame</strong>: <code>static_block("ROLE", config.instructions_frame_text)</code>. The scaffold's role contract and output discipline. Its default text additionally names two conventions the model must understand: that it activates a listed skill by calling <code>Skill(name)</code>, and that content delimited by <code>&lt;untrusted_content&gt;</code> markers is data, never instructions. Scaffold-owned, config-overridable.
+        <div class="callout" data-kind="caveat">
+          <span class="callout-label">Known wrinkle, deferred</span>
+          <div class="callout-body"><p>The skill-activation sentence lives in the always-present frame, so a deployment that discovers zero skills gets a frame naming the <code>Skill</code> tool when no such tool is registered and no <code>&lt;SKILLS&gt;</code> block exists. It is inert: the sentence is conditioned on "a skill listed in <code>&lt;SKILLS&gt;</code>", and a model can only call tools in its schema: but the cleaner placement is the catalog contributor's output. Fold this move into the next deliberate frame-text edit, since it changes the literal and trips the <a href="#G8">G8</a> hash.</p></div>
+        </div>
+      </li>
+      <li><strong>Persona</strong>: <code>static_block("PERSONA", config.persona_text)</code>. Who the agent IS. When <code>MemoryStore</code> lands, this is the one contributor that changes: it becomes a computed contributor reading <code>MemoryStore.core_blocks()</code>, with no change to the composer or to any other contributor.</li>
+      <li><strong>Skills catalog</strong>: a computed contributor. Renders one entry per discovered skill as <code>- {name}: {truncated description}</code>, wraps the result with <code>wrap("SKILLS", …)</code>, and returns the empty string when no skills are discovered.</li>
+    </ol>
+
+    <div class="callout" data-kind="rationale">
+      <span class="callout-label">Truncation rule</span>
+      <div class="callout-body"><p>Search the first 250 characters of <code>description</code> for a sentence terminator (<code>.</code>, <code>!</code>, or <code>?</code>) followed by whitespace or end-of-string; if one is found and the text up to it is ≤200 characters, cut there. Otherwise, if the whole description is ≤200 characters, keep it. Otherwise hard-cut at 200, strip trailing whitespace, append <code>…</code>.</p></div>
+    </div>
+
+    <p>The core agent is constructed with the static <code>instructions=</code> parameter unused: the composer owns all Instructions content. After this change <code>Run.instructions</code> equals the full string the model received.</p>
+
+    <h4 id="design-registration-order">Registration order</h4>
+    <p>Contributors apply in registration order (the composer is FIFO). Because each block is XML-tagged, the <em>sequence</em> of persona, catalog, and the future memory index is not semantically load-bearing: the model finds <code>&lt;SKILLS&gt;</code> by its tag wherever it sits.</p>
+    <p>One ordering constraint survives: <strong>the frame is registered first</strong>, because it is the interpretive contract: it tells the model how to read <code>&lt;untrusted_content&gt;</code> and what <code>Skill(name)</code> does, and the model should read the rule before the content it governs.</p>
+    <p>The registration order is otherwise fixed so the composed string is byte-stable (the prompt-cache prefix discipline) and is pinned by a contributor-order assertion in the scaffold test suite: a reorder is a visible, reviewed change caught by that assertion, not a semantic error. It is <em>not</em> caught by the anti-revert content-hash test: that test hashes each contributor's <em>text</em> (the <code>instructions_frame_text</code> literal, per <a href="#G8">G8</a>), which a reorder leaves byte-identical.</p>
+    <p>This slice also updates <a class="xref doc" href="#">docs/architecture.md</a> <a class="xref" href="#">Instructions composer</a> to match: its rule-3 worked example ("the Skills catalog must precede consumer text") is removed, and the section gains the XML-delimited-block convention and the softened ordering rule.</p>
+  </section>
+
+  <section>
+    <h2>Invariants</h2>
+    <ol class="id-list" data-kind="invariant">
+      <li id="I1"><span class="id-tag">I1</span><div class="id-body">Every registered function tool has both <code>trust_class</code> and <code>side_effect_class</code> in its <code>ToolDefinition.metadata</code>. No tool reaches a model request un-classified.</div></li>
+      <li id="I2"><span class="id-tag">I2</span><div class="id-body"><code>Run.instructions</code> for a successful run equals the byte-for-byte string the model received as its instructions: the composer owns all Instructions content, nothing rides the static slot.</div></li>
+      <li id="I3"><span class="id-tag">I3</span><div class="id-body">A skill <code>name</code> exposed in the <code>Skill</code> tool enum corresponds to exactly one discovered skill record (collisions resolved at discovery, project wins).</div></li>
+      <li id="I4"><span class="id-tag">I4</span><div class="id-body">Each Instructions contributor emits at most one XML-delimited block: a non-empty block carries its named tag; an empty contributor (e.g. the catalog with no skills discovered) contributes nothing and the composer skips it. The scaffold-frame block is registered first. The full registration order is fixed so the composed string is byte-stable but, beyond frame-first, not semantically load-bearing. A reorder is caught by a contributor-order assertion in the scaffold test suite, <em>not</em> by the anti-revert content-hash test: <a href="#G8">G8</a>'s hash covers only the <code>instructions_frame_text</code> literal, which a reorder leaves byte-identical. <strong>Content anti-revert and structural anti-revert are separate guarantees with separate tests.</strong></div></li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>Journeys</h2>
+
+    <div class="journey">
+      <div class="journey-head">
+        <span class="journey-id">J-skills-01</span>
+        <h3 class="journey-title">Author and activate a skill</h3>
+      </div>
+      <div class="journey-body">
+        <section>
+          <h4>Pre-conditions</h4>
+          <ul>
+            <li>A project skill directory exists with one valid <code>SKILL.md</code>.</li>
+          </ul>
+        </section>
+        <section>
+          <h4>Steps</h4>
+          <ol class="journey-steps">
+            <li>Start an agent; the skills catalog appears in <code>Run.instructions</code>.</li>
+            <li>The catalog lists the authored skill's name and description.</li>
+            <li>The agent calls <code>Skill(name)</code> for that skill.</li>
+            <li>The tool result contains the frontmatter-stripped body inside the structural wrapper.</li>
+            <li>The activation persists as an ordinary tool-call/tool-return pair in the <code>Run</code>'s messages.</li>
+          </ol>
+        </section>
+      </div>
+    </div>
+
+    <div class="journey">
+      <div class="journey-head">
+        <span class="journey-id">J-skills-02</span>
+        <h3 class="journey-title">Untrusted tool result is wrapped</h3>
+      </div>
+      <div class="journey-body">
+        <section>
+          <h4>Pre-conditions</h4>
+          <ul>
+            <li>A test-only tool registered with <code>trust_class="untrusted"</code>.</li>
+          </ul>
+        </section>
+        <section>
+          <h4>Steps</h4>
+          <ol class="journey-steps">
+            <li>The agent invokes the untrusted tool.</li>
+            <li>The tool result the model receives is enclosed in <code>&lt;untrusted_content&gt;…&lt;/untrusted_content&gt;</code>.</li>
+            <li>A trusted tool's result in the same run carries no such markers.</li>
+          </ol>
+        </section>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Resolved questions</h2>
+    <table class="compact">
+      <thead><tr><th style="width:40px">#</th><th>Question</th><th style="width:48%">Decision</th></tr></thead>
+      <tbody>
+        <tr><td><code>Q1</code></td><td>Build the <code>&lt;untrusted_content&gt;</code> wrapping path now, or defer until a real untrusted tool exists?</td><td><strong>Build now;</strong> exercise it with a test-only untrusted tool fixture: the seam is complete and proven the day it lands, and <code>ToolCapability</code> is the single convergence point per arch.</td></tr>
+        <tr><td><code>Q2</code></td><td>Is the Instructions-composer migration its own prerequisite spec or part of this one?</td><td><strong>Part of this spec</strong>: the skills catalog must be a composer contributor, and capture invariant <a href="#I2">I2</a> requires the composer to own all Instructions content; while <code>instruction_text</code> rides the static slot it bypasses capture.</td></tr>
+        <tr><td><code>Q3</code></td><td>What does <code>Skill(name)</code> return on activation?</td><td><strong>Frontmatter-stripped body, structurally wrapped,</strong> as a <code>tool_result</code>: follows the Agent Skills standard's dedicated-tool activation pattern.</td></tr>
+        <tr><td><code>Q4</code></td><td>Where does the persona block sit relative to the skills catalog?</td><td><strong>Position made non-load-bearing.</strong> Every block is XML-tagged, so the model finds a section by its tag. Only frame-first is fixed (it carries the interpretive conventions). The scaffold is modeled on Letta, which builds the context window from memory blocks addressed by a unique <code>label</code> rather than by position; the XML-tagged Instructions blocks are the same idea.</td></tr>
+        <tr><td><code>Q5</code></td><td>Is the scaffold frame fixed in code or config-overridable?</td><td><strong>Config-overridable</strong>: <code>instructions_frame_text</code> carries a scaffold default a deployment may replace; its anti-revert hash is pinned for the default.</td></tr>
+        <tr><td><code>Q6</code></td><td>Should the <code>Skill</code> tool be registered when no skills are discovered?</td><td><strong>No</strong>: an enum with zero members is invalid and a no-op tool is noise; the tool is registered only when ≥1 skill exists.</td></tr>
+        <tr><td><code>Q7</code></td><td>One reusable contributor function, or a distinct function per block?</td><td><strong>A shared <code>wrap(tag, text)</code> primitive</strong> plus a <code>static_block</code> helper for literal-text blocks (frame, persona); the skills catalog is the one bespoke contributor because its text is computed.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Testing strategy</h2>
+    <ul>
+      <li><strong>Unit-tested:</strong> <code>ToolCapability</code>: tools registered with each <code>trust_class</code>/<code>side_effect_class</code> value; assert pass-through, gate routing, and <code>&lt;untrusted_content&gt;</code> wrapping per branch.</li>
+      <li><strong>Unit-tested:</strong> metadata fail-fast: register a tool missing a metadata field; assert agent construction raises.</li>
+      <li><strong>Unit-tested:</strong> <code>SkillRegistry</code> discovery and parsing: fixture skill tree with a valid skill, a project/user name collision, and a malformed <code>SKILL.md</code>; assert the registry resolves the collision project-wins and skips the malformed file with a warning.</li>
+      <li><strong>Unit-tested:</strong> Instructions composer: assert the frame block is first, each contributor's output is an XML-delimited block carrying its named tag, and <code>Run.instructions</code> equals the composed string (invariant <a href="#I2">I2</a>).</li>
+      <li><strong>Journey-tested:</strong> skill authoring → catalog → activation: <code>J-skills-01</code> runs against a live agent over a fixture skill tree.</li>
+      <li><strong>Journey-tested:</strong> untrusted-content wrapping: <code>J-skills-02</code> runs with a test-only untrusted tool fixture.</li>
+      <li><strong>Anti-revert:</strong> the default <code>instructions_frame_text</code>: pinned content-hash test, updated in the same commit as any change to the literal.</li>
+      <li><strong>Not tested:</strong> the L1 side-effect gate's approval logic: it is a deliberate no-op at L1; only the routing into it is tested.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Forward-compatibility</h2>
+    <ul>
+      <li>The persona contributor reads <code>config.persona_text</code> today and is expected to swap to <code>MemoryStore.core_blocks()</code> when <code>MemoryStore</code> lands. The contributor boundary: a function of deps returning a string: is the stable interface.</li>
+      <li>The memory-index contributor registers after the frame, alongside persona and the skills catalog. Because blocks are XML-tagged, its exact position is not load-bearing: invariant <a href="#I4">I4</a> constrains only "after the frame."</li>
+      <li>The L1 side-effect gate is a no-op that L3 replaces with a human approval queue. Callers route through the gate today so that swap is internal to <code>ToolCapability</code>.</li>
+      <li>The tool-metadata convention is the forward contract for every future tool (memory tools, web fetch, retrieval). New untrusted tools need no <code>ToolCapability</code> change: they declare <code>trust_class="untrusted"</code> and the existing wrapping path handles them.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Interfaces</h2>
+    <table>
+      <thead><tr><th>Neighbor</th><th>Interface</th></tr></thead>
+      <tbody>
+        <tr><td><a class="xref doc" href="#">docs/architecture.md</a> <a class="xref" href="#">Instructions composer</a></td><td>Consumes the contributor registry; this spec registers three contributors and corrects the ordering example.</td></tr>
+        <tr><td><a class="xref doc" href="#">docs/architecture.md</a> <a class="xref" href="#">AgentConfig</a></td><td>Renames <code>instruction_text</code> → <code>instructions_frame_text</code> + <code>persona_text</code>.</td></tr>
+        <tr><td><a class="xref doc" href="#">docs/architecture.md</a> <a class="xref" href="#">ToolCapability</a></td><td>Implements the documented seam (metadata convention, gate, wrapping).</td></tr>
+        <tr><td><a class="xref doc" href="#">docs/architecture.md</a> <a class="xref" href="#">Run</a> / <a class="xref" href="#">Anti-revert content-hash discipline</a></td><td><code>Run.instructions</code> becomes complete (<a href="#I2">I2</a>); the frame text gains a pinned hash (<a href="#G8">G8</a>).</td></tr>
+        <tr><td>Future <code>MemoryStore</code> spec</td><td>Provides: the tool-metadata convention memory tools follow, and the contributor slot for the memory index.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>References</h2>
+    <ul>
+      <li><a class="xref doc" href="#">docs/architecture.md</a>: <a class="xref" href="#">ToolCapability</a>, <a class="xref" href="#">SkillRegistry &amp; Skill tool</a>, <a class="xref" href="#">Instructions composer</a>, <a class="xref" href="#">AgentConfig</a>, <a class="xref" href="#">Anti-revert content-hash discipline</a>.</li>
+      <li><a class="xref doc" href="#">docs/pydantic-ai/hooks-reference.md</a>: the <code>before_tool_execute</code> / <code>after_tool_execute</code> boundary and <code>SkipToolExecution</code>; capability registration styles.</li>
+      <li>The Agent Skills standard: <a href="https://agentskills.io/specification">agentskills.io/specification</a> (file format, frontmatter fields, three-tier progressive disclosure) and <a href="https://agentskills.io/client-implementation/adding-skills-support">client-implementation/adding-skills-support</a>.</li>
+      <li>Root <a class="xref doc" href="#">CLAUDE.md</a>: "Instructions" vs "system_prompt" naming convention.</li>
+    </ul>
+  </section>
+
+  <footer class="doc-footer">
+    <span>atelier-plans · v1</span>
+    <span>spec · skills-and-tools · 2026-05-15</span>
+    <span>press <code>⌘E</code> to toggle edit · <code>⌘S</code> to download · <code>⌘P</code> to print</span>
+  </footer>
+
+</article>
+
+
+  <aside class="rail">
+    <div class="rail-toc">
+      <h5>On this page</h5>
+    </div>
+  </aside>
+
+</div>
+
+<script id="plan-js-inline">
+/* ============================================================
+   Atelier Plans runtime
+   Handles: TOC, edit mode, persistence, code highlight,
+            mermaid, task/status cycling, export, copy-diff.
+   ============================================================ */
+
+(function () {
+  'use strict';
+
+  // ---------- toast ----------
+  let toastHost;
+  function toast(msg, ms = 1800) {
+    if (!toastHost) {
+      toastHost = document.createElement('div');
+      toastHost.className = 'toast-host';
+      document.body.appendChild(toastHost);
+    }
+    const t = document.createElement('div');
+    t.className = 'toast';
+    t.textContent = msg;
+    toastHost.appendChild(t);
+    setTimeout(() => t.remove(), ms);
+  }
+
+  // ---------- storage ----------
+  const storageKey = () => 'atelier-plan:' + (location.pathname || '/');
+  function loadState() {
+    try { return JSON.parse(localStorage.getItem(storageKey()) || '{}'); }
+    catch { return {}; }
+  }
+  function saveState(s) {
+    try { localStorage.setItem(storageKey(), JSON.stringify(s)); } catch {}
+  }
+  const state = loadState();
+  function patch(key, val) {
+    state[key] = val;
+    saveState(state);
+  }
+
+  // ---------- section numbering + TOC ----------
+  function buildTOC() {
+    const doc = document.querySelector('.doc');
+    if (!doc) return;
+    const rail = document.querySelector('.rail-toc');
+    if (!rail) return;
+    const headings = doc.querySelectorAll('h2');
+    const ol = document.createElement('ol');
+    headings.forEach((h, i) => {
+      const n = String(i + 1).padStart(2, '0');
+      h.dataset.num = n;
+      if (!h.id) h.id = 'sec-' + n + '-' + slug(h.textContent);
+      const li = document.createElement('li');
+      const a  = document.createElement('a');
+      a.href = '#' + h.id;
+      a.textContent = h.textContent.trim();
+      li.appendChild(a);
+      // sub-TOC for h3s if section is dense
+      const sec = h.closest('section') || h.parentElement;
+      const subs = sec ? sec.querySelectorAll(':scope > h3') : [];
+      if (subs.length >= 3) {
+        const subOl = document.createElement('ol');
+        subOl.className = 'rail-sub';
+        subs.forEach(sub => {
+          if (!sub.id) sub.id = 'sub-' + slug(sub.textContent);
+          const subLi = document.createElement('li');
+          const subA = document.createElement('a');
+          subA.href = '#' + sub.id;
+          subA.textContent = sub.textContent.trim();
+          subLi.appendChild(subA);
+          subOl.appendChild(subLi);
+        });
+        li.appendChild(subOl);
+      }
+      ol.appendChild(li);
+    });
+    rail.appendChild(ol);
+
+    // active-on-scroll
+    const links = rail.querySelectorAll('a');
+    const byId = {};
+    links.forEach(a => byId[a.getAttribute('href').slice(1)] = a);
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        const a = byId[e.target.id];
+        if (!a) return;
+        if (e.isIntersecting) {
+          links.forEach(l => l.classList.remove('active'));
+          a.classList.add('active');
+        }
+      });
+    }, { rootMargin: '-30% 0px -65% 0px' });
+    headings.forEach(h => io.observe(h));
+  }
+
+  function slug(s) {
+    return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 40);
+  }
+
+  // ---------- reading progress ----------
+  function buildProgress() {
+    const rail = document.querySelector('.rail-toc');
+    if (!rail) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'rail-progress';
+    const bar = document.createElement('div');
+    wrap.appendChild(bar);
+    rail.appendChild(wrap);
+    function tick() {
+      const h = document.documentElement;
+      const max = h.scrollHeight - h.clientHeight;
+      const pct = max > 0 ? Math.min(100, (h.scrollTop / max) * 100) : 0;
+      bar.style.width = pct.toFixed(1) + '%';
+    }
+    document.addEventListener('scroll', tick, { passive: true });
+    tick();
+  }
+
+  // ---------- edit mode ----------
+  let editOn = state.edit !== false; // default ON
+  const EDITABLE_SEL = '.doc h1, .doc h2, .doc h3, .doc h4, .doc p, .doc li, .doc blockquote, .doc td, .doc th, .doc .callout-body, .decision-title, .phase .phase-title, .doc-title, .doc-summary, .task-text';
+
+  function wireEditable() {
+    document.querySelectorAll(EDITABLE_SEL).forEach(el => {
+      if (el.closest('.code-block, pre, .mermaid, .rail, .topbar, .doc-footer')) return;
+      el.setAttribute('contenteditable', 'true');
+      el.setAttribute('spellcheck', 'true');
+    });
+    // restore saved edits
+    if (state.edits) {
+      Object.entries(state.edits).forEach(([k, v]) => {
+        const el = document.querySelector('[data-edit-id="' + k + '"]');
+        if (el) el.innerHTML = v;
+      });
+    }
+    // capture changes
+    document.addEventListener('input', (e) => {
+      const el = e.target.closest('[contenteditable="true"]');
+      if (!el) return;
+      const id = ensureEditId(el);
+      const edits = state.edits || {};
+      edits[id] = el.innerHTML;
+      patch('edits', edits);
+    });
+  }
+  let editIdCounter = 0;
+  function ensureEditId(el) {
+    if (!el.dataset.editId) {
+      // stable-ish id from path + ordinal
+      const path = [];
+      let cur = el;
+      while (cur && cur !== document.body) {
+        const p = cur.parentElement;
+        if (!p) break;
+        const i = Array.from(p.children).indexOf(cur);
+        path.unshift(cur.tagName + i);
+        cur = p;
+      }
+      el.dataset.editId = path.join('>');
+    }
+    return el.dataset.editId;
+  }
+
+  function setEditMode(on) {
+    editOn = on;
+    document.body.classList.toggle('edit-off', !on);
+    patch('edit', on);
+    const btn = document.querySelector('[data-action="toggle-edit"]');
+    if (btn) btn.textContent = on ? 'Edit · on' : 'Edit · off';
+  }
+
+  // ---------- task & status cycling ----------
+  const TASK_CYCLE = ['todo', 'doing', 'done', 'blocked'];
+  const STATUS_CYCLE = ['draft', 'in-review', 'approved', 'shipped', 'blocked'];
+
+  function wireTasks() {
+    document.querySelectorAll('.tasks li').forEach((li, i) => {
+      if (!li.dataset.status) li.dataset.status = 'todo';
+      if (!li.dataset.taskId) li.dataset.taskId = 't' + i;
+      const saved = (state.tasks || {})[li.dataset.taskId];
+      if (saved) li.dataset.status = saved;
+      const check = li.querySelector('.task-check');
+      if (check) {
+        check.setAttribute('role', 'checkbox');
+        check.setAttribute('tabindex', '0');
+        check.addEventListener('click', (e) => {
+          if (!editOn) return;
+          const cur = li.dataset.status || 'todo';
+          const next = TASK_CYCLE[(TASK_CYCLE.indexOf(cur) + 1) % TASK_CYCLE.length];
+          li.dataset.status = next;
+          const tasks = state.tasks || {};
+          tasks[li.dataset.taskId] = next;
+          patch('tasks', tasks);
+          e.stopPropagation();
+        });
+      }
+    });
+
+    document.querySelectorAll('.status[data-editable]').forEach((s, i) => {
+      if (!s.dataset.statusId) s.dataset.statusId = 's' + i;
+      const saved = (state.statuses || {})[s.dataset.statusId];
+      if (saved) s.dataset.status = saved;
+      // refresh label text node
+      refreshStatusLabel(s);
+      s.addEventListener('click', () => {
+        if (!editOn) return;
+        const cur = s.dataset.status || 'draft';
+        const next = STATUS_CYCLE[(STATUS_CYCLE.indexOf(cur) + 1) % STATUS_CYCLE.length];
+        s.dataset.status = next;
+        refreshStatusLabel(s);
+        const statuses = state.statuses || {};
+        statuses[s.dataset.statusId] = next;
+        patch('statuses', statuses);
+      });
+    });
+  }
+  function refreshStatusLabel(s) {
+    // find or create the trailing text node after the ::before dot
+    let txt = Array.from(s.childNodes).find(n => n.nodeType === 3);
+    if (!txt) {
+      txt = document.createTextNode('');
+      s.appendChild(txt);
+    }
+    txt.nodeValue = s.dataset.status.replace(/-/g, ' ');
+  }
+
+  // ---------- collapsible sections ----------
+  function wireCollapsible() {
+    document.querySelectorAll('section.collapsible > h2').forEach(h => {
+      h.addEventListener('click', (e) => {
+        // only collapse when the click is on the heading background, not the editable text
+        if (e.target !== h) return;
+        h.parentElement.classList.toggle('collapsed');
+      });
+    });
+  }
+
+  // ---------- code blocks: copy + filename + lang ----------
+  function wireCode() {
+    document.querySelectorAll('.code-block').forEach(block => {
+      const head = block.querySelector('.code-head');
+      if (head && !head.querySelector('.copy')) {
+        const btn = document.createElement('button');
+        btn.className = 'btn ghost copy';
+        btn.type = 'button';
+        btn.textContent = 'copy';
+        btn.dataset.editOnly = '';
+        btn.addEventListener('click', () => {
+          const pre = block.querySelector('pre');
+          if (!pre) return;
+          navigator.clipboard.writeText(pre.innerText).then(() => {
+            btn.textContent = 'copied';
+            setTimeout(() => btn.textContent = 'copy', 1400);
+          });
+        });
+        head.appendChild(btn);
+      }
+    });
+  }
+
+  // ---------- mermaid lazy init ----------
+  function captureMermaidSource() {
+    document.querySelectorAll('pre.mermaid').forEach(el => {
+      if (!el.dataset.mermaidSource) {
+        el.dataset.mermaidSource = el.textContent;
+      }
+    });
+  }
+  function initMermaid() {
+    const blocks = document.querySelectorAll('.mermaid');
+    if (!blocks.length || !window.mermaid) return;
+    captureMermaidSource();
+    window.mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: 'loose',
+      theme: 'base',
+      fontFamily: "Geist, -apple-system, sans-serif",
+      themeVariables: {
+        background: '#F7F4EE',
+        primaryColor: '#EFEAE0',
+        primaryTextColor: '#1E1B16',
+        primaryBorderColor: '#B8B0A0',
+        lineColor: '#6C6557',
+        secondaryColor: '#D6E0D9',
+        tertiaryColor: '#F1D4C5',
+        clusterBkg: '#EFEAE0',
+        clusterBorder: '#D6CFBE',
+        edgeLabelBackground: '#F7F4EE',
+        nodeTextColor: '#1E1B16',
+        actorBkg: '#F1D4C5',
+        actorBorder: '#B8462B',
+        actorTextColor: '#1E1B16',
+        labelBoxBkgColor: '#EFEAE0',
+        labelBoxBorderColor: '#D6CFBE',
+        noteBkgColor: '#EDDFBE',
+        noteBorderColor: '#E0C988',
+      }
+    });
+    window.mermaid.run({ querySelector: '.mermaid' }).catch(err => console.error('mermaid:', err));
+  }
+
+  // ---------- prism lazy init ----------
+  function initPrism() {
+    if (window.Prism) window.Prism.highlightAll();
+  }
+
+  // ---------- export & diff ----------
+  function exportHTML() {
+    const clone = document.documentElement.cloneNode(true);
+    // strip transient classes & runtime attributes from the clone
+    clone.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
+    clone.querySelectorAll('[spellcheck]').forEach(el => el.removeAttribute('spellcheck'));
+    clone.querySelectorAll('.toast-host').forEach(el => el.remove());
+    clone.querySelector('body')?.classList.remove('edit-off');
+    const html = '<!doctype html>\n' + clone.outerHTML;
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = (document.title || 'plan') + '.html';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('Downloaded edited plan');
+  }
+
+  function copyForClaudeCode() {
+    // human-readable changeset for paste-back to Claude Code
+    const lines = ['# Edits to apply (Atelier Plans)'];
+    lines.push('# Source: ' + (location.pathname || ''));
+    lines.push('# Generated: ' + new Date().toISOString());
+    lines.push('');
+    const edits = state.edits || {};
+    Object.entries(edits).forEach(([id, html]) => {
+      const el = document.querySelector('[data-edit-id="' + id + '"]');
+      if (!el) return;
+      const tag = el.tagName.toLowerCase();
+      const label = el.closest('section')?.querySelector('h2')?.textContent?.trim() || '(top)';
+      lines.push('--- ' + label + ' / ' + tag + ' ---');
+      lines.push(stripHTML(html));
+      lines.push('');
+    });
+    const tasks = state.tasks || {};
+    if (Object.keys(tasks).length) {
+      lines.push('## Task status changes');
+      Object.entries(tasks).forEach(([k, v]) => {
+        const el = document.querySelector('[data-task-id="' + k + '"]');
+        const txt = el?.querySelector('.task-text')?.textContent?.trim() || k;
+        lines.push('- [' + v + '] ' + txt);
+      });
+      lines.push('');
+    }
+    const statuses = state.statuses || {};
+    if (Object.keys(statuses).length) {
+      lines.push('## Status changes');
+      Object.entries(statuses).forEach(([k, v]) => lines.push('- ' + k + ': ' + v));
+    }
+    const out = lines.join('\n');
+    navigator.clipboard.writeText(out).then(() => toast('Copied edits. Paste to Claude Code.'));
+  }
+
+  function stripHTML(s) {
+    const d = document.createElement('div');
+    d.innerHTML = s;
+    return d.textContent.replace(/\s+/g, ' ').trim();
+  }
+
+  // ---------- markdown export ----------
+  function exportMarkdown() {
+    const out = [];
+
+    // ----- YAML frontmatter from .doc-header metadata -----
+    const fm = {};
+    const title = qText('.doc-title');
+    const summary = qText('.doc-summary');
+    if (title)   fm.title = title;
+    if (summary) fm.summary = summary;
+
+    // eyebrow: "Feature design · RFC-014" + status pill
+    const eyebrowText = document.querySelector('.doc-eyebrow > span:nth-of-type(1)')?.textContent?.trim();
+    if (eyebrowText) fm.kind = eyebrowText;
+    const headerStatus = document.querySelector('.doc-header .status');
+    if (headerStatus?.dataset?.status) fm.status = headerStatus.dataset.status;
+
+    // meta dl rows
+    document.querySelectorAll('.doc-meta > div').forEach(d => {
+      const dt = d.querySelector('dt')?.textContent.trim().toLowerCase();
+      const dd = d.querySelector('dd');
+      if (!dt || !dd) return;
+      const tags = dd.querySelectorAll('.tag');
+      if (tags.length) {
+        fm[dt] = Array.from(tags).map(t => t.textContent.trim());
+      } else {
+        const links = dd.querySelectorAll('a');
+        if (links.length > 1) fm[dt] = Array.from(links).map(a => a.textContent.trim());
+        else fm[dt] = dd.textContent.replace(/\s+/g, ' ').trim();
+      }
+    });
+
+    if (Object.keys(fm).length) {
+      out.push('---');
+      for (const [k, v] of Object.entries(fm)) {
+        if (Array.isArray(v)) {
+          out.push(k + ': [' + v.map(yamlScalar).join(', ') + ']');
+        } else {
+          out.push(k + ': ' + yamlScalar(v));
+        }
+      }
+      out.push('---', '');
+    }
+
+    // ----- body -----
+    if (title) out.push('# ' + title, '');
+    if (summary) out.push('_' + summary + '_', '');
+
+    document.querySelectorAll('.doc > section').forEach(sec => {
+      sectionToMd(sec).forEach(l => out.push(l));
+    });
+
+    // dedupe consecutive blanks
+    return out.filter((l, i, a) => !(l === '' && a[i-1] === '')).join('\n').trim() + '\n';
+  }
+
+  function qText(sel) {
+    const el = document.querySelector(sel);
+    return el ? el.textContent.replace(/\s+/g, ' ').trim() : '';
+  }
+
+  function yamlScalar(v) {
+    if (v == null) return '""';
+    const s = String(v);
+    if (s === '') return '""';
+    if (/^[a-zA-Z0-9_\-.@/ ]+$/.test(s)
+        && !/^(true|false|null|yes|no|on|off)$/i.test(s)
+        && !/^[\d\-]/.test(s)) {
+      return s;
+    }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s; // bare date
+    return '"' + s.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+  }
+
+  function sectionToMd(sec) {
+    const out = [];
+    const h2 = sec.querySelector(':scope > h2');
+    if (h2) {
+      const n = h2.dataset.num;
+      const t = textOf(h2);
+      out.push('', (n ? '## ' + n + '. ' + t : '## ' + t), '');
+    }
+    Array.from(sec.children).forEach(node => {
+      if (node === h2) return;
+      nodeToMd(node).forEach(l => out.push(l));
+    });
+    return out;
+  }
+
+  function textOf(el) { return el.textContent.replace(/\s+/g, ' ').trim(); }
+
+  function nodeToMd(el) {
+    if (!el || el.nodeType !== 1) return [];
+
+    if (el.matches('.callout'))      return calloutToMd(el);
+    if (el.matches('.decision'))     return decisionToMd(el);
+    if (el.matches('.changeset'))    return changesetToMd(el);
+    if (el.matches('.journey'))      return journeyToMd(el);
+    if (el.matches('.amendment'))    return amendmentToMd(el);
+    if (el.matches('.relations'))    return relationsToMd(el);
+    if (el.matches('ul.id-list, ol.id-list')) return idListToMd(el);
+    if (el.matches('ol.prompt-stack, ul.prompt-stack')) return promptStackToMd(el);
+    if (el.matches('ol.tasks, ul.tasks')) return tasksToMd(el);
+    if (el.matches('.phases'))       return phasesToMd(el);
+    if (el.matches('details.diff'))  return diffToMd(el);
+    if (el.matches('.code-block'))   return codeBlockToMd(el);
+    if (el.matches('figure.diagram, figure.figure')) return figureToMd(el);
+    if (el.matches('.matrix'))       return matrixToMd(el);
+    if (el.matches('pre.mermaid'))   return fence(el.dataset.mermaidSource || el.textContent, 'mermaid');
+    if (el.matches('pre.ascii'))     return fence(el.textContent, '');
+
+    const tag = el.tagName.toLowerCase();
+    switch (tag) {
+      case 'h3': return ['', '### ' + inlineMd(el), ''];
+      case 'h4': return ['', '#### ' + inlineMd(el), ''];
+      case 'p': {
+        if (el.classList.contains('lede')) return ['', '> _' + inlineMd(el) + '_', ''];
+        return [inlineMd(el), ''];
+      }
+      case 'ul': {
+        const out = [];
+        el.querySelectorAll(':scope > li').forEach(li => out.push('- ' + inlineMd(li)));
+        out.push('');
+        return out;
+      }
+      case 'ol': {
+        const out = []; let i = 1;
+        el.querySelectorAll(':scope > li').forEach(li => out.push((i++) + '. ' + inlineMd(li)));
+        out.push('');
+        return out;
+      }
+      case 'blockquote': {
+        const out = [''];
+        inlineMd(el).split('\n').forEach(line => out.push('> ' + line));
+        out.push('');
+        return out;
+      }
+      case 'table': return tableToMd(el);
+      case 'hr':    return ['', '---', ''];
+      case 'pre':   return fence(el.textContent, '');
+      case 'section': return sectionToMd(el);
+      default: {
+        const out = [];
+        Array.from(el.children).forEach(c => nodeToMd(c).forEach(l => out.push(l)));
+        return out;
+      }
+    }
+  }
+
+  function inlineMd(el) {
+    let s = '';
+    el.childNodes.forEach(n => {
+      if (n.nodeType === 3) { s += n.textContent; return; }
+      if (n.nodeType !== 1) return;
+      const t = n.tagName.toLowerCase();
+      const inner = inlineMd(n);
+      switch (t) {
+        case 'strong': case 'b': s += '**' + inner + '**'; break;
+        case 'em': case 'i':     s += '_' + inner + '_'; break;
+        case 'code':             s += '`' + n.textContent + '`'; break;
+        case 'a': {
+          // xref-style links render bare in markdown
+          if (n.classList.contains('xref')) {
+            s += '`§' + (inner.replace(/^§/, '')) + '`';
+          } else {
+            s += '[' + inner + '](' + (n.getAttribute('href') || '#') + ')';
+          }
+          break;
+        }
+        case 'br':               s += '  \n'; break;
+        case 'span': case 'time':case 'small': s += inner; break;
+        default:                 s += inner;
+      }
+    });
+    return s.replace(/[ \t]+/g, ' ').replace(/\n /g, '\n').trim();
+  }
+
+  function idListToMd(el) {
+    const out = [''];
+    const kind = el.dataset.kind || '';
+    el.querySelectorAll(':scope > li').forEach(li => {
+      const tag = li.querySelector('.id-tag')?.textContent.trim() || '';
+      const body = li.querySelector('.id-body');
+      const text = body ? inlineMd(body) : inlineMd(li);
+      out.push('- **' + tag + (kind ? ' (' + kind + ')' : '') + '.** ' + text);
+    });
+    out.push('');
+    return out;
+  }
+
+  function journeyToMd(el) {
+    const out = [''];
+    const id = el.querySelector('.journey-id')?.textContent.trim() || '';
+    const title = el.querySelector('.journey-title')?.textContent.trim() || '';
+    out.push('### ' + (id ? id + ': ' : '') + title, '');
+    el.querySelectorAll('.journey-body > section').forEach(section => {
+      const h = section.querySelector('h4');
+      if (h) out.push('**' + h.textContent.trim() + '**', '');
+      const isSteps = section.querySelector('.journey-steps');
+      if (isSteps) {
+        section.querySelectorAll('.journey-steps > li').forEach(li => {
+          out.push('- [ ] ' + inlineMd(li));
+        });
+      } else {
+        section.querySelectorAll('ul li, ol li').forEach(li => {
+          out.push('- ' + inlineMd(li));
+        });
+      }
+      out.push('');
+    });
+    return out;
+  }
+
+  function amendmentToMd(el) {
+    const label = el.querySelector('.amendment-label')?.textContent.trim() || 'Amended';
+    const body = el.querySelector('p');
+    return ['', '> **' + label + ':** ' + (body ? inlineMd(body) : ''), ''];
+  }
+
+  function relationsToMd(el) {
+    const out = [''];
+    el.querySelectorAll('.relation').forEach(r => {
+      const label = r.querySelector('.relation-label')?.textContent.trim() || '';
+      const body  = r.querySelector('.relation-body');
+      if (body) out.push('- **' + label + ':** ' + inlineMd(body));
+    });
+    out.push('');
+    return out;
+  }
+
+  function promptStackToMd(el) {
+    const out = ['', '**Composed stack** (registration order):', ''];
+    el.querySelectorAll(':scope > li').forEach((li, i) => {
+      const tag = li.querySelector('.stack-tag')?.textContent.trim() || '';
+      const body = li.querySelector('.stack-body');
+      const state = li.dataset.state || '';
+      out.push((i + 1) + '. `<' + tag + '>`: ' + (body ? inlineMd(body) : '') + (state ? ' _(' + state + ')_' : ''));
+    });
+    out.push('');
+    return out;
+  }
+
+  function calloutToMd(el) {
+    const kind  = (el.dataset.kind || 'note').toUpperCase();
+    const label = el.querySelector('.callout-label')?.textContent.trim() || kind;
+    const map = { goal: 'TIP', 'non-goal': 'NOTE', question: 'IMPORTANT', assumption: 'NOTE',
+                  risk: 'CAUTION', key: 'IMPORTANT', note: 'NOTE' };
+    const gh = map[(el.dataset.kind || 'note')] || 'NOTE';
+    const out = ['', '> [!' + gh + '] ' + label];
+    const body = el.querySelector('.callout-body');
+    if (body) {
+      const inner = [];
+      Array.from(body.children).forEach(c => nodeToMd(c).forEach(l => inner.push(l)));
+      inner.forEach(l => out.push(l === '' ? '>' : '> ' + l));
+    }
+    out.push('');
+    return out;
+  }
+
+  function decisionToMd(el) {
+    const id    = el.querySelector('.decision-id')?.textContent.trim() || '';
+    const title = el.querySelector('.decision-title')?.textContent.trim() || '';
+    const stat  = el.querySelector('.status')?.dataset?.status || '';
+    const out = ['', '### ' + (id ? id + ': ' : '') + title];
+    if (stat) out.push('', '_Status: ' + stat + '_');
+    out.push('');
+    el.querySelectorAll(':scope > p').forEach(p => out.push(inlineMd(p), ''));
+    const meta = el.querySelector('.decision-meta');
+    if (meta) {
+      meta.querySelectorAll('dt').forEach(dt => {
+        const dd = dt.nextElementSibling;
+        if (dd) out.push('- **' + dt.textContent.trim() + ':** ' + dd.textContent.replace(/\s+/g, ' ').trim());
+      });
+      out.push('');
+    }
+    return out;
+  }
+
+  function changesetToMd(el) {
+    const out = ['', '**Changeset**', ''];
+    el.querySelectorAll('ul.tree > li').forEach(li => {
+      const op = li.dataset.op;
+      const sym = op === 'add' ? '+' : op === 'del' ? '−' : '~';
+      const path = li.querySelector('.path')?.textContent.trim() || '';
+      const note = li.querySelector('.note')?.textContent.trim() || '';
+      out.push('- `' + sym + ' ' + path + '`' + (note ? ': ' + note : ''));
+    });
+    out.push('');
+    return out;
+  }
+
+  function tasksToMd(el) {
+    const out = [''];
+    el.querySelectorAll(':scope > li').forEach(li => {
+      const status = li.dataset.status || 'todo';
+      const box = status === 'done' ? 'x' : status === 'doing' ? '·' : status === 'blocked' ? '!' : ' ';
+      const text   = li.querySelector('.task-text')?.textContent.replace(/\s+/g, ' ').trim() || '';
+      const owner  = li.querySelector('.task-owner')?.textContent.trim() || '';
+      const est    = li.querySelector('.task-est')?.textContent.trim() || '';
+      const tail = [];
+      if (status !== 'todo' && status !== 'done') tail.push(status);
+      if (owner) tail.push(owner);
+      if (est && est !== '-') tail.push(est);
+      out.push('- [' + box + '] ' + text + (tail.length ? ' _(' + tail.join(' · ') + ')_' : ''));
+    });
+    out.push('');
+    return out;
+  }
+
+  function phasesToMd(el) {
+    const out = ['', '**Phases**', ''];
+    el.querySelectorAll('.phase').forEach(p => {
+      const label = p.querySelector('.phase-label')?.textContent.trim();
+      const title = p.querySelector('.phase-title')?.textContent.trim();
+      const state = p.dataset.state || '';
+      out.push('- **' + label + ': ' + title + '** _(' + state + ')_');
+      p.querySelectorAll('ul li').forEach(li => out.push('  - ' + li.textContent.trim()));
+    });
+    out.push('');
+    return out;
+  }
+
+  function diffToMd(el) {
+    const summary = el.querySelector('summary')?.textContent.trim() || 'diff';
+    const out = ['', '**' + summary + '**', '', '```diff'];
+    el.querySelectorAll('.line').forEach(l => {
+      const sym = l.classList.contains('add') ? '+' : l.classList.contains('del') ? '-' : ' ';
+      out.push(sym + l.textContent);
+    });
+    out.push('```', '');
+    return out;
+  }
+
+  function codeBlockToMd(el) {
+    const filename = el.querySelector('.filename')?.textContent.trim() || '';
+    const lang = el.querySelector('.lang')?.textContent.trim().toLowerCase() || '';
+    const code = el.querySelector('pre')?.textContent || '';
+    const out = [''];
+    if (filename) out.push('**' + filename + '**', '');
+    out.push('```' + lang, code.replace(/\n+$/, ''), '```', '');
+    return out;
+  }
+
+  function figureToMd(el) {
+    const out = [''];
+    const captionEl = el.querySelector('.figure-caption, .caption, figcaption');
+    const caption = captionEl?.textContent.replace(/\s+/g, ' ').trim();
+    Array.from(el.children).forEach(n => {
+      if (n === captionEl) return;
+      if (n.matches('pre.mermaid')) out.push('```mermaid', (n.dataset.mermaidSource || n.textContent).trim(), '```');
+      else if (n.matches('pre.ascii')) out.push('```', n.textContent.replace(/\n+$/, ''), '```');
+      else if (n.matches('pre'))    out.push('```', n.textContent.replace(/\n+$/, ''), '```');
+      else if (n.tagName === 'SVG' || n.querySelector?.('svg')) {
+        out.push('<!-- inline SVG illustration (preserved as HTML) -->');
+        out.push(n.outerHTML);
+      }
+      else nodeToMd(n).forEach(l => out.push(l));
+    });
+    if (caption) out.push('', '_Figure. ' + caption + '_');
+    out.push('');
+    return out;
+  }
+
+  function matrixToMd(el) {
+    const out = ['', '**Matrix**', ''];
+    const cells = el.querySelectorAll('.cell');
+    const xs = Array.from(el.querySelectorAll('.axis-x')).map(a => a.textContent.trim());
+    const ys = Array.from(el.querySelectorAll('.axis-y')).map(a => a.textContent.trim());
+    out.push('|   | ' + xs.join(' | ') + ' |');
+    out.push('|---|' + xs.map(() => '---|').join(''));
+    for (let r = 0; r < ys.length; r++) {
+      const row = ['**' + ys[r] + '**'];
+      for (let c = 0; c < xs.length; c++) {
+        const cell = cells[r * xs.length + c];
+        if (!cell) { row.push(''); continue; }
+        const lbl = cell.querySelector('.cell-label')?.textContent.trim() || '';
+        const txt = Array.from(cell.querySelectorAll('p')).map(p => p.textContent.trim()).join(' ');
+        row.push((lbl ? '_' + lbl + '_ ' : '') + txt);
+      }
+      out.push('| ' + row.join(' | ') + ' |');
+    }
+    out.push('');
+    return out;
+  }
+
+  function tableToMd(el) {
+    const out = [''];
+    const headers = Array.from(el.querySelectorAll('thead th')).map(th => th.textContent.trim());
+    if (headers.length) {
+      out.push('| ' + headers.join(' | ') + ' |');
+      out.push('|' + headers.map(() => '---').join('|') + '|');
+    }
+    el.querySelectorAll('tbody tr').forEach(tr => {
+      const cells = Array.from(tr.querySelectorAll('td')).map(td =>
+        td.textContent.replace(/\s+/g, ' ').replace(/\|/g, '\\|').trim());
+      out.push('| ' + cells.join(' | ') + ' |');
+    });
+    out.push('');
+    return out;
+  }
+
+  function fence(text, lang) {
+    return ['', '```' + (lang || ''), text.replace(/\n+$/, ''), '```', ''];
+  }
+
+  function copyMarkdown() {
+    const md = exportMarkdown();
+    navigator.clipboard.writeText(md).then(() => toast('Copied as markdown'));
+  }
+
+  function resetEdits() {
+    if (!confirm('Discard all browser edits and reload the original?')) return;
+    localStorage.removeItem(storageKey());
+    location.reload();
+  }
+
+  // ---------- dropdown menu ----------
+  function wireMenus() {
+    document.querySelectorAll('[data-menu]').forEach(wrap => {
+      const toggle = wrap.querySelector('[data-menu-toggle]');
+      if (!toggle) return;
+      toggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const wasOpen = wrap.classList.contains('open');
+        document.querySelectorAll('[data-menu].open').forEach(w => w.classList.remove('open'));
+        if (!wasOpen) wrap.classList.add('open');
+      });
+      wrap.querySelectorAll('.btn-menu button').forEach(b => {
+        b.addEventListener('click', () => setTimeout(() => wrap.classList.remove('open'), 0));
+      });
+    });
+    document.addEventListener('click', () => {
+      document.querySelectorAll('[data-menu].open').forEach(w => w.classList.remove('open'));
+    });
+  }
+
+  // ---------- top bar wiring ----------
+  function wireTopbar() {
+    document.querySelectorAll('[data-action]').forEach(btn => {
+      const a = btn.dataset.action;
+      btn.addEventListener('click', () => {
+        if (a === 'toggle-edit')      setEditMode(!editOn);
+        else if (a === 'export-html') exportHTML();
+        else if (a === 'copy-diff')   copyForClaudeCode();
+        else if (a === 'copy-md')     copyMarkdown();
+        else if (a === 'reset-edits') resetEdits();
+        else if (a === 'print')       window.print();
+      });
+    });
+  }
+
+  // ---------- keyboard shortcuts ----------
+  function wireKeys() {
+    document.addEventListener('keydown', (e) => {
+      if (e.target.closest('[contenteditable="true"]')) return;
+      if ((e.metaKey || e.ctrlKey) && e.key === 'e') { e.preventDefault(); setEditMode(!editOn); }
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); exportHTML(); }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'p' && e.shiftKey) { e.preventDefault(); window.print(); }
+    });
+  }
+
+  // ---------- diagram helper: sparkline ----------
+  function renderSparks() {
+    document.querySelectorAll('.spark[data-values]').forEach(el => {
+      const vals = el.dataset.values.split(',').map(Number);
+      if (!vals.length) return;
+      const w = vals.length * 8, h = 18;
+      const min = Math.min(...vals), max = Math.max(...vals);
+      const range = max - min || 1;
+      const d = vals.map((v, i) => {
+        const x = i * (w / (vals.length - 1 || 1));
+        const y = h - ((v - min) / range) * (h - 2) - 1;
+        return (i === 0 ? 'M' : 'L') + x.toFixed(1) + ' ' + y.toFixed(1);
+      }).join(' ');
+      el.innerHTML = '<svg viewBox="0 0 ' + w + ' ' + h + '" width="' + w + '" height="' + h + '"><path d="' + d + '"/></svg>';
+    });
+  }
+
+  // ---------- init ----------
+  function init() {
+    captureMermaidSource();
+    buildTOC();
+    buildProgress();
+    wireEditable();
+    wireTasks();
+    wireCollapsible();
+    wireCode();
+    wireTopbar();
+    wireMenus();
+    wireKeys();
+    renderSparks();
+    setEditMode(editOn);
+    // mermaid + prism may be loaded async
+    if (window.mermaid) initMermaid();
+    else window.addEventListener('mermaid-ready', initMermaid);
+    if (window.Prism) initPrism();
+    else window.addEventListener('prism-ready', initPrism);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+
+  // expose a small API for ad-hoc use
+  window.AtelierPlans = { toast, exportHTML, exportMarkdown, copyForClaudeCode, copyMarkdown, resetEdits, setEditMode };
+})();
+
+</script>
+</body>
+</html>

@@ -13,8 +13,34 @@ Assume they are a skilled developer, but know almost nothing about our toolset o
 
 **Announce at start:** "I'm using the writing-plans skill to create the implementation plan."
 
-**Save plans to:** `docs/plans/YYYY-MM-DD-<feature-name>.md`
-- (User preferences for plan location override this default)
+**Save plans to:**
+- Markdown (canonical, default): `docs/plans/YYYY-MM-DD-<feature-name>.md`
+- HTML (only if the user accepts the interactive iteration offer below): `docs/plans/html/YYYY-MM-DD-<feature-name>.html`. The Markdown export remains the canonical artifact that `subagent-driven-development` consumes.
+- (User preferences for plan location override these defaults)
+
+## Interactive HTML Iteration
+
+A browser-based authoring surface for the implementation plan, parallel to brainstorming's Visual Companion but for the plan document itself. The infrastructure (template, styling, runtime) lives at `.claude/skills/writing-plans/assets/`; the authoring guide lives in `html-authoring.md` (sibling of this file). Available as a tool — not a mode. Accepting the tool means the plan is drafted as styled HTML the user can edit inline and round-trip back; declining means the plan is written as plain Markdown directly. Either way, Markdown is the canonical handoff form.
+
+**Offering the tool:** Right after the "I'm using the writing-plans skill" announcement, make the offer as its own message:
+
+> "Plans are easier to iterate on as styled HTML you can edit in a browser, especially for longer plans. I can produce the plan as a self-contained HTML file you can open locally, edit inline (status pills, task checkboxes, prose), then either paste a diff back here for me to revise, or click Copy markdown to finalize. This requires opening a local file in your browser. Want to use it? (Plain Markdown is the default if you'd rather skip the browser round-trip.)"
+
+**This offer MUST be its own message.** Do not combine it with content from the plan, scope-check observations, or any clarifying questions. Wait for the user's response before continuing.
+
+**Scaling rule:** for trivial plans (one or two tasks, no architectural decisions, a small touch-up), skip the offer entirely and write plain Markdown. Don't force browser ceremony on small work. The offer is for plans long enough to benefit from inline review.
+
+**If declined:** behave as today. Author the plan in plain Markdown at the canonical path and proceed to self-review and execution handoff.
+
+**If accepted (the iteration loop):**
+
+1. Read `html-authoring.md` (the sibling guide) before authoring. It contains the workflow, component vocabulary, voice conventions, diagram options, and the two copy primitives that shape the iteration loop. Copy the template from `.claude/skills/writing-plans/assets/plan-template.html` to `docs/plans/html/YYYY-MM-DD-<feature-name>.html` and author the plan there. Tell the user the path and that they can open it locally.
+2. The user reviews in the browser, edits inline, then chooses one of:
+   - **Paste a diff back into the chat.** Read the diff, apply the change, regenerate the HTML at the same path, and return to step 2.
+   - **Click Copy markdown to finalize.** The user can either save the result directly to the canonical Markdown path themselves, or paste it back to the chat and you save it. Loop exits.
+3. Once the Markdown file exists, treat it as canonical. The user may ask for further Markdown-mode refinement; do that as normal edits. When the plan is ready, proceed to self-review and execution handoff against the Markdown form.
+
+The HTML file is the drafting surface. The Markdown file is the handoff artifact. Do not hand off from the HTML form.
 
 ## Scope Check
 
@@ -131,7 +157,9 @@ If you find issues, fix them inline. No need to re-review — just fix and move 
 
 ## Execution Handoff
 
-After saving the plan, hand off to execution:
+Handoff fires from the **Markdown** form regardless of whether the plan started in HTML or Markdown. If the plan is still HTML at this point (the user iterated in the browser but hasn't yet exported), ask the user to click Copy markdown and save it to the canonical Markdown path before handoff.
+
+After the Markdown plan is saved, hand off to execution:
 
 **"Plan complete and saved to `docs/plans/<filename>.md`. Ready to execute via subagent-driven-development: I'll dispatch a fresh subagent per task and review between tasks. Say the word and I'll start."**
 

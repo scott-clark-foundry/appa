@@ -26,7 +26,7 @@ You MUST create a task for each of these items and complete them in order:
 3. **Ask clarifying questions** — one at a time, understand purpose/constraints/success criteria
 4. **Propose 2-3 approaches** — with trade-offs and your recommendation
 5. **Present design** — in sections scaled to their complexity, get user approval after each section
-6. **Write design doc** — author with the atelier-plans skill (default) or plain Markdown for trivial specs; save under `docs/specs/` and commit
+6. **Write design doc** — save as Markdown under `docs/specs/` and commit
 7. **Spec self-review** — quick inline check for placeholders, contradictions, ambiguity, scope (see below)
 8. **User reviews written spec** — ask user to review the spec file before proceeding
 9. **Transition to implementation** — invoke writing-plans skill to create implementation plan
@@ -63,7 +63,7 @@ digraph brainstorming {
 }
 ```
 
-**The terminal state is invoking writing-plans.** atelier-plans is the spec-authoring helper *during* this skill (step 6); writing-plans is the ONLY skill you invoke *after* brainstorming. Do NOT invoke any implementation skill from this step.
+**The terminal state is invoking writing-plans.** writing-plans is the ONLY skill you invoke *after* brainstorming. Do NOT invoke any implementation skill from this step.
 
 ## The Process
 
@@ -108,7 +108,7 @@ digraph brainstorming {
 
 **Documentation:**
 
-- Author the spec via the atelier-plans skill for HTML output, or write plain Markdown for trivial specs. Save under `docs/specs/YYYY-MM-DD-<topic>-design.<html|md>`.
+- Write the spec as Markdown under `docs/specs/YYYY-MM-DD-<topic>-design.md`.
   - (User preferences for spec location override this default)
 - Commit the design document to git
 
@@ -143,12 +143,6 @@ Wait for the user's response. If they request changes, make them and re-run the 
 - **Incremental validation** - Present design, get approval before moving on
 - **Be flexible** - Go back and clarify when something doesn't make sense
 
-## Spec format: atelier-plans
-
-When step 6 says "write the design doc," prefer the atelier-plans skill: it authors the spec as a self-contained, styled HTML file the user can edit inline in the browser and return as a paste-back diff, or finalize as Markdown via Copy markdown. Fall back to plain Markdown for trivial specs.
-
-This is a different tool from the Visual Companion (below). Atelier-plans produces the **persistent spec artifact** at step 6; the Visual Companion is the **transient visual question channel** used during steps 3 and 5 for mockups, layouts, and side-by-side comparisons. Both render in a browser, but the wrong one for a given job will hurt: a spec pushed through the Visual Companion loses state on the next screen; a "pick one of three layouts" ask in atelier-plans is overkill for a transient question.
-
 ## Visual Companion
 
 A browser-based companion for showing mockups, diagrams, and visual options during brainstorming. Available as a tool — not a mode. Accepting the companion means it's available for questions that benefit from visual treatment; it does NOT mean every question goes through the browser.
@@ -166,4 +160,4 @@ A browser-based companion for showing mockups, diagrams, and visual options duri
 A question about a UI topic is not automatically a visual question. "What does personality mean in this context?" is a conceptual question — use the terminal. "Which wizard layout works better?" is a visual question — use the browser.
 
 If they agree to the companion, read the detailed guide before proceeding:
-`skills/brainstorming/visual-companion.md`
+`visual-companion.md`
