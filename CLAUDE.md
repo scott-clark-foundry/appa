@@ -3,14 +3,13 @@
 
 `scratch/` is a personal sandbox for portfolio and learning work toward an Agent Engineer role. It is not a single application; it is several adjacent things in one tree.
 
-- `docs/plans/` progression plans and design docs in their canonical markdown form; atelier-plans authoring HTML is archived under `docs/plans/html/`.
-- `dist/atelier-plans/` the packaged `atelier-plans` skill itself. Treat as a published artifact, not active source.
+- `docs/plans/` progression plans and design docs in their canonical markdown form; HTML drafts from the writing-plans iteration loop live under `docs/plans/html/`.
 - `analogs/` reference repos cloned for study (`obsidian-wiki`, `obsidian-llm-wiki-local`, `obsidian-skills`). Read-only by default. Do not modify unless explicitly asked.
 - `.claude/skills/` locally installed skills for this project.
 
 Default language: Python. Default package manager: `uv` (not pip or poetry).
 
-Non-trivial plans move through two distinct forms. They are brainstormed and drafted interactively as atelier-plans HTML, then converted to markdown once finalized (or close to it); markdown is the canonical working form. These are two different things, not interchangeable: HTML is the drafting medium, markdown is the finished artifact. Returning to the atelier to brainstorm a new piece (a later phase, a major revision) is expected, and produces a fresh HTML draft that later converts back to markdown.
+Non-trivial plans move through two distinct forms. They are drafted interactively as HTML via the writing-plans iteration loop, then converted to markdown once finalized (or close to it); markdown is the canonical working form. These are two different things, not interchangeable: HTML is the drafting medium, markdown is the finished artifact. Returning to the HTML form for a later phase or a major revision is expected, and produces a fresh draft that later converts back to markdown.
 
 ## Public/private boundary
 
@@ -31,12 +30,51 @@ Rules:
 
 The project is built by two coordinated Claude Code instances, one per repo:
 
-- **Planning instance (this one, in `scratch/`).** Scott and Claude do the heavy planning here: brainstorming in the atelier, finalizing plans to markdown, choosing phase scope and order. This is the planner.
+- **Planning instance (this one, in `scratch/`).** Scott and Claude do the heavy planning here: brainstorming, drafting and finalizing plans to markdown, choosing phase scope and order. This is the planner.
 - **Implementation instance (in `assistant/`).** A separate Claude Code instance that takes a finalized phase plan and does the implementation and testing. This is the worker.
 
-The handoff artifact is a finalized, product-voiced phase plan: the planning instance produces it, the implementation instance consumes it. The implementation instance works only inside `assistant/` and only ever sees product-voiced material, so the public/private boundary holds by construction. The exact delivery mechanism is settled when phase 1 is planned.
+The handoff artifact is a finalized, product-voiced phase plan: the planning instance produces it, the implementation instance consumes it. The implementation instance works only inside `assistant/` and only ever sees product-voiced material, so the public/private boundary holds by construction. The literal delivery mechanism is documented in the next section.
 
 This is the planner/worker split (the same pattern the portfolio reaches in phase 9) applied to the build itself: each instance keeps a focused context, so planning detail does not clutter implementation and vice versa.
+
+## Phase artifact lifecycle
+
+Per-phase artifacts in `scratch/`:
+
+```
+docs/
+  plans/
+    python-llm-app-progression.md   ← master, never split
+    NN-<slug>.md                    ← phase plan (product-voiced)
+    html/
+      NN-<slug>.html                ← optional writing-plans iteration draft
+  specs/
+    NN-<slug>.md                    ← phase spec (private, conversation-rich)
+```
+
+`NN` is the two-digit zero-padded phase number (`00`, `01`, ..., `10`). `<slug>` matches the eventual branch name where applicable (e.g., `01-transcripts` pairs with `feat/transcripts`).
+
+The **spec** captures brainstorming Q&A, exploration of alternatives, and any planning-rationale flavor. It stays in `scratch/` permanently and is never copied or referenced from `assistant/`.
+
+The **plan** is written in product voice from the start: zero portfolio framing, zero "interview" or career narrative. It is the handoff artifact.
+
+At handoff time, the planning instance copies the finalized plan into `assistant/`:
+
+```
+cp docs/plans/NN-<slug>.md ../assistant/docs/plans/NN-<slug>.md
+```
+
+The `scratch/` copy is the immutable "as handed over" snapshot. The `assistant/` copy is the live execution document the implementation instance edits as tasks complete. The implementation instance never reads from `scratch/`.
+
+Architecture docs, ADRs, and NOTES.md sections in `assistant/` are authored fresh during implementation, derived from the progression plan + spec + plan triple. They are not copied out of `scratch/`.
+
+The progression plan tracks status by appending an **Artifacts** line to each phase section once that phase has spec and plan files:
+
+> **Artifacts.** [Spec](../specs/01-transcripts.md) · [Plan](../plans/01-transcripts.md)
+
+Absent until the spec is written; updated when the plan is written; further updated when the phase merges in `assistant/`.
+
+The init scaffolding follows the same lifecycle as numbered phases (spec, plan, then merge into `assistant/main`), with filename prefix `00-`.
 
 ## Style preferences
 

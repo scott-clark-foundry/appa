@@ -111,8 +111,9 @@ _Figure. Figure 1. Ten phases, each landing on main as a feature branch. Phases 
 
 ## 08. Development cycle
 
-One repo (`assistant/`), one main branch, one persistent product. The portfolio artifact is the repo’s history: an init commit that scaffolds the assistant, then ten phases, each delivered as a feature branch that adds one capability and merges to main with tests, evals, and a CHANGELOG entry. Anchor IDs (`#l1`…`#l10`) below match the phase numbers so xrefs from invariants and ADRs still resolve.
+One repo (`assistant/`), one main branch, one persistent product. The portfolio artifact is the repo’s history: an init commit that scaffolds the assistant, then ten phases, each delivered as a feature branch that adds one capability and merges to main with tests, evals, and a CHANGELOG entry. Anchor IDs (`#l0`…`#l10`) below match the phase numbers so xrefs from invariants and ADRs still resolve. The init scaffold is `#l0`; capability phases are `#l1` through `#l10`.
 
+<a id="l0"></a>
 ### Init · `assistant/` scaffolding
 
 **What lands on main.** Pydantic-ai `Agent` with zero tools registered. FastAPI app with one Server-Sent Events chat endpoint. Conversation is in-memory only: chat works within a running process; durable persistence arrives in phase 1. Tracing via pydantic-ai’s Logfire instrumentation, enabled at init; structlog configured for application logging. Provider model-string config (`MODEL=openai:gpt-4o-mini` by default). Vault paths created (`memory/`, `skills/`, `evals/`, `transcripts/`) but unused. ruff + mypy + CI. One smoke test (chat round-trip). One eval fixture format.
@@ -121,6 +122,9 @@ One repo (`assistant/`), one main branch, one persistent product. The portfolio 
 
 **DOD.** Provider abstraction enforced (`§I9`), traces logging (`§I5`), eval fixture loadable, smoke test green.
 
+**Artifacts.** [Spec](../specs/00-init-scaffold.md) · [Plan](00-init-scaffold.md)
+
+<a id="l1"></a>
 ### Phase 1 · `feat/transcripts`
 
 **Adds.** The first persistence layer. Every completed (or cancelled) turn renders at session end to `vault/transcripts/{date}/{session}.md`. Introduces the `§vault-write primitives` (manifest + staging + provenance markers) for the first time; every later phase that writes to the vault reuses them.
@@ -131,6 +135,7 @@ One repo (`assistant/`), one main branch, one persistent product. The portfolio 
 
 **Merge.** Main has browsable transcripts.
 
+<a id="l2"></a>
 ### Phase 2 · `feat/semantic-recall`
 
 **Adds.** Embedding index (`chromadb` or `sqlite-vec`) over completed turns plus a BM25 lexical index alongside. Pre-turn retrieval injects top-k (3–5) relevant past exchanges into the system prompt for that turn only. Chunking is per turn at first cut (one user message + assistant response = one chunk); per-topic clustering deferred. Index persisted alongside session data, outside the vault. Embeddings route through the indexer’s own provider-agnostic interface (chromadb embedding functions), not through pydantic-ai.
@@ -141,6 +146,7 @@ One repo (`assistant/`), one main branch, one persistent product. The portfolio 
 
 **Merge.** Main remembers what you talked about.
 
+<a id="l3"></a>
 ### Phase 3 · `feat/declarative-memory`
 
 **Adds.** Markdown files in `vault/memory/` always-loaded as part of the Agent’s system prompt under a token budget (default ~1000 tokens; older facts age out into a searchable not-always-loaded tier). Background fact extraction via `direct.model_request` after each turn (non-blocking; the next turn sees updates). Contradiction detection at write time via embedding similarity, resolved by superseding with citation to the contradicting exchange.
@@ -151,6 +157,7 @@ One repo (`assistant/`), one main branch, one persistent product. The portfolio 
 
 **Merge.** Main knows you between sessions.
 
+<a id="l4"></a>
 ### Phase 4 · `feat/skills`
 
 **Adds.** `SKILL.md` files in `vault/skills/` with agentskills.io frontmatter (`name`, `description`); provenance rides in the spec’s client-key escape hatch as `metadata.source` (user-written vs agent-written). Match-on-input is description-driven, as the spec intends: embedding similarity between the user’s turn and each skill’s `description`, which catches rephrasings a keyword list would miss. Matched skills inject into the Agent’s system prompt in priority order, capped by a token budget. Watchdog-watched directory; new skills picked up without restart. `§Progressive disclosure`: skill bodies plus optional `references/` and `scripts/` loaded only when the workflow points to them. User-edited and (later) agent-written skills coexist; `metadata.source` distinguishes them.
@@ -161,6 +168,7 @@ One repo (`assistant/`), one main branch, one persistent product. The portfolio 
 
 **Merge.** Main has opinions about recurring tasks.
 
+<a id="l5"></a>
 ### Phase 5 · `feat/eval-harness` · _the pivot_
 
 **Adds.** CLI plus library that loads per-intent fixture datasets (in `vault/evals/{phase}/` as markdown with frontmatter), runs each capability against its fixtures on current `main`, scores via `direct.model_request` judge calls, and writes eval results with rollups per fixture, bucket, and skill. Comparison view in `rich`: prompt-version A vs B, model X vs Y, skill-version v1 vs v2. Diskcache-backed judge cache prevents cost explosions across re-runs. Phases 1–4 are scored by adding their fixture buckets and running them against current `main`: “retroactive” means extending eval coverage back over earlier capabilities, not reproducing historical behavior. Each capability stays importable as a package so the harness can invoke it directly.
@@ -171,6 +179,7 @@ One repo (`assistant/`), one main branch, one persistent product. The portfolio 
 
 **Merge.** Main can be tuned against itself.
 
+<a id="l6"></a>
 ### Phase 6 · `feat/first-tool`
 
 **Adds.** First `@agent.tool` registered with the pydantic-ai Agent. Function is `fetch_url(url: str) -> str` (or `web_search(q) -> list[Result]`); choice driven by what phases 1–5 trace data shows you most often want to outsource. Pydantic-ai auto-generates the JSON schema from the typed signature. Tools receive a pydantic-ai `RunContext` carrying shared dependencies (config, clients). Tool errors surface to the Agent as result content; the Agent decides retry, clarify, or give up. Every invocation traced (args, return, latency, cost). The interesting work is tool design and tracing, not the loop (pydantic-ai handles that).
@@ -181,6 +190,7 @@ One repo (`assistant/`), one main branch, one persistent product. The portfolio 
 
 **Merge.** Main can reach outside the conversation.
 
+<a id="l7"></a>
 ### Phase 7 · `feat/multi-tool-routing`
 
 **Adds.** Several tools registered (`fetch_url`, `web_search`, `vault_search`, `current_time`, and read-only Bluesky tools `bsky_search` and `bsky_get_thread` via the `atproto` client and the `getPostThreadV2` lexicon, plus one or two others chosen from what phases 1–6 traces show you actually wanted to outsource). System prompt explicitly tells the Agent to consult memory (`§phase 3`) and skills (`§phase 4`) _before_ calling tools. Memory and skills also exposed as tools the Agent can invoke on demand. Per-turn budget (max N tool calls, max wall-clock seconds) caps runaway loops. Parallel tool calls handled by pydantic-ai. Tool cost tracked alongside model cost in the traces.
@@ -191,6 +201,7 @@ One repo (`assistant/`), one main branch, one persistent product. The portfolio 
 
 **Merge.** Main is a real assistant.
 
+<a id="l8"></a>
 ### Phase 8 · `feat/skill-drafter`
 
 **Adds.** Scheduled job (`assistant skills draft`, also cron-runnable) that mines recent traces for repeated request patterns lacking matching skills. Pattern discovery is an aggregation step, not a single LLM call: embed the request turns and cluster them (embedding clusters, or frequent-itemset over tool/intent sequences), then surface clusters above a frequency threshold. Only then does a `direct.model_request` draft a `SKILL.md` per cluster, returning a typed `SkillDraft` Pydantic model into `vault/skills/_staging/`. Drafts carry the source trace IDs for human auditing. A review CLI (`assistant skills review`) promotes drafts into `vault/skills/`. Promotion is human-gated at this phase; `§phase 10` is when promotion becomes self-directed.
@@ -205,6 +216,7 @@ One repo (`assistant/`), one main branch, one persistent product. The portfolio 
 
 **Merge.** Main proposes improvements to itself.
 
+<a id="l9"></a>
 ### Phase 9 · `feat/planner-worker`
 
 **Adds.** Two pydantic-ai Agents in a structured contract. The planner is read-only (a tool whitelist enforces it) and emits a typed `Plan`: a list of steps, each naming a worker action plus its expected outcome. The worker executes one step at a time and returns structured results; the planner re-plans after observing them. The read-only/read-write split is the point: the planner holds no write tools, so a bad plan costs nothing until the worker acts on it. The handoff is a typed `Plan` object, not a shared transcript. Long-horizon tasks checkpoint their progress (mechanism deferred) and resume on crash.
@@ -217,6 +229,7 @@ One repo (`assistant/`), one main branch, one persistent product. The portfolio 
 
 **Merge.** Main can take all-afternoon tasks.
 
+<a id="l10"></a>
 ### Phase 10 · `feat/self-improving`
 
 **Adds.** Meta-Agent reads the trace history, clusters skill-following failures via a `direct.model_request` returning typed cluster descriptors, and runs [DSPy](https://github.com/stanfordnlp/dspy)’s GEPA optimizer over the affected `SKILL.md` bodies. Candidate skill versions land in `vault/skills/_proposed/`. Auto-promotion when a held-out eval slice clears a conservative, pre-registered threshold; failures auto-revert. The slice size and effect threshold are fixed when phase 5’s eval suite is built, with the slice large enough that the threshold is statistically meaningful. Runs on a configurable schedule (default weekly). The user-gated drafter from `§phase 8` stays as the discovery counterpart to this phase’s auto-gated optimization.
