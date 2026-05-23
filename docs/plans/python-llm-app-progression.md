@@ -14,13 +14,9 @@ _One repository, one persistent personal LLM assistant, built in ten phases. pyd
 
 ## 01. Intent
 
-> [!TIP] Goal
-> Build one public repository (`assistant/`) that grows from a daily-use chat assistant into a self-improving one across an init commit and ten merged feature branches. Each phase teaches one new concept, the assistant is useful to a human (starting with the author) after every merge, and refactoring earlier code as the architecture matures is expected. The throughline is one persistent product, not ten frozen artifacts.
->
+One public repository, `assistant/`, holding a single persistent personal LLM assistant. It begins as a chat tool useful from its first day and grows, one capability at a time, into an assistant that proposes and improves its own skills. The codebase is a living product: earlier code is refactored as the architecture matures, not frozen as a stack of finished deliverables.
 
-> [!NOTE] Non-goals
-> - Enterprise-scale production: “production” here means publishable, polished, and useful, not SLA-grade.
->
+The portfolio value is the documented evolution. Not ten standalone demos, but one repository whose git history, an init commit followed by ten merged feature branches, reads as a single coherent build an “Agent Engineer” hiring manager can follow end to end. The throughline is one persistent product, not ten frozen artifacts.
 
 > [!IMPORTANT] Key insight
 > Eval strategy will be the spine of every branch, not an afterthought.
@@ -29,7 +25,7 @@ _One repository, one persistent personal LLM assistant, built in ten phases. pyd
 ## 02. Goals
 
 - **G1 (goal).** Each phase introduces exactly one new technical concept, feature, or agent paradigm the author can articulate and defend in an “Agent Engineer” job interview.
-- **G2 (goal).** Each phase produces a working app a human would actually use: not a notebook, not a demo.
+- **G2 (goal).** Each phase produces a working app a human would actually use, starting with the author as its first daily user: not a notebook, not a demo. The assistant is useful after every merge, not only at phase 10.
 - **G3 (goal).** One repo (`assistant/`), one `main` branch. Each capability ships as a feature branch that lands on `main` with tests, eval suite, CHANGELOG entry, and a NOTES.md section explaining the one concept the phase teaches. The repo’s git history is the portfolio artifact. See [ADR-005](#decisions).
 - **G4 (goal).** Every phase uses the same stack: pydantic-ai and FastAPI with a hand-rolled application layer.
 - **G5 (goal).** Every phase contributes to one growing personal assistant. The Obsidian vault is the memory substrate; tools are added when they earn their place; no phase is a standalone data pipeline.
@@ -40,6 +36,7 @@ _One repository, one persistent personal LLM assistant, built in ten phases. pyd
 - **NG1 (non-goal).** Framework cargo-culting outside the pydantic-ai adoption. No LangChain, CrewAI, LlamaIndex, OpenAI Agents SDK, or Claude Agent SDK in this curriculum. _(Pydantic-ai is the chosen model abstraction per [ADR-001](#decisions). See [I7](#I7).)_
 - **NG2 (non-goal).** A unified frontend across all phases. CLI / TUI / web is per-phase; the Obsidian plugin is the north star, not a deliverable per phase.
 - **NG3 (non-goal).** Multi-tenant SaaS shape. One repo, one main branch, one deployment, one user on one machine. Serving many tenants with isolation, billing, and per-tenant config is out of scope.
+- **NG4 (non-goal).** Enterprise-grade production. “Production” here means publishable, polished, and useful to a human, not SLA-grade: no uptime guarantee, no scaling or on-call surface. Phases ship at “good enough for a public repo,” not “deployable to paying customers.”
 
 ## 04. Invariants
 
