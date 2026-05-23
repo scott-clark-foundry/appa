@@ -7,9 +7,9 @@ description: Use when you have a spec or requirements for a multi-step task, bef
 
 ## Overview
 
-Write comprehensive implementation plans assuming the engineer has zero context for our codebase and questionable taste. Document everything they need to know: which files to touch for each task, code, testing, docs they might need to check, how to test it. Give them the whole plan as bite-sized tasks. DRY. YAGNI. TDD. Frequent commits.
+Write implementation plans that document **contracts**, not implementation. The reader is the implementer: another capable engineer (often another full Claude Code instance) with access to the codebase, library docs, and reference docs in `docs/references/`. Tell them what must be true after each task (interfaces, schemas, behaviors, acceptance criteria), and let them choose how to satisfy it. Give them the whole plan as bite-sized tasks. DRY. YAGNI. TDD. Frequent commits.
 
-Assume they are a skilled developer, but know almost nothing about our toolset or problem domain. Assume they don't know good test design very well.
+The plan is one half of the handoff; the other half is the reference docs the plan links to (see `## Reference Docs` below). Together they carry the cross-phase context; the plan body itself stays focused on what *this* phase delivers.
 
 **Announce at start:** "I'm using the writing-plans skill to create the implementation plan."
 
@@ -79,10 +79,39 @@ This structure informs the task decomposition. Each task should produce self-con
 
 **Architecture:** [2-3 sentences about approach]
 
-**Tech Stack:** [Key technologies/libraries]
+**Tech Stack:** [Key technologies/libraries; for cross-phase tech context, link to a reference doc instead of restating]
+
+**References:** Bullet list of `docs/references/<name>.md` files the implementer should read first. Omit if the plan needs no cross-phase context.
 
 ---
 ```
+
+## Reference Docs
+
+`docs/references/<name>.md` is where cross-phase context lives. The plan body describes *this phase*; reference docs hold conventions, patterns, and contracts that span multiple phases.
+
+**Author a reference doc when:**
+
+- The plan body would otherwise need a paragraph of cross-phase context (tech-stack rationale, project-wide conventions, contracts from earlier phases).
+- A pattern is introduced now and will be reused in later phases (e.g., vault-write primitives, a test-seam pattern, a judge-call cache).
+- The implementer would otherwise have to dig through earlier plan bodies to learn a project-wide convention.
+
+**Don't author one when:**
+
+- The detail is phase-local. State it inline.
+- It is tutorial content for an external library. Link to the library's own docs.
+- It is decision rationale. That goes in ADRs or the spec.
+
+Default to NOT creating one. Create when the cost of NOT having it (implementer guesses wrong, phases drift apart) exceeds the cost of writing a short file.
+
+**Structure.**
+
+- One concern per file.
+- Plain markdown, short, anchored on the contract or convention.
+- Linked from every plan that depends on it via the plan header's `**References:**` line.
+- For projects with a planner/implementer split across two repos, follow that project's CLAUDE.md guidance on where the canonical (planner) and live (implementer) copies live.
+
+The implementer may amend the live copy as implementation reveals refinement, the same way it may amend the plan itself. The planner reconciles those amendments into the canonical copy when the next phase is planned.
 
 ## Task Structure
 
@@ -94,54 +123,65 @@ This structure informs the task decomposition. Each task should produce self-con
 - Modify: `exact/path/to/existing.py:123-145`
 - Test: `tests/exact/path/to/test.py`
 
-- [ ] **Step 1: Write the failing test**
+**Contract:**
+- Public signature: `def function(input: InputModel) -> OutputModel`
+- Behavior: maps `input.field` to `output.field` per `docs/references/<concern>.md`; raises `ValueError` on empty input.
+- Tested by: `test_function_maps_fields_correctly`, `test_function_raises_on_empty_input`.
 
-```python
-def test_specific_behavior():
-    result = function(input)
-    assert result == expected
-```
+- [ ] **Step 1: Write the failing tests**
 
-- [ ] **Step 2: Run test to verify it fails**
+  Write `test_function_maps_fields_correctly` (happy-path mapping) and `test_function_raises_on_empty_input` (the `ValueError`). Test structure (fixtures, parametrize, etc.) is the implementer's call.
 
-Run: `pytest tests/path/test.py::test_name -v`
-Expected: FAIL with "function not defined"
+- [ ] **Step 2: Run tests to verify they fail**
 
-- [ ] **Step 3: Write minimal implementation**
+  Run: `pytest tests/path/test.py -v`
+  Expected: FAIL with `ImportError` or `NameError` for `function`.
 
-```python
-def function(input):
-    return expected
-```
+- [ ] **Step 3: Implement to satisfy the contract**
 
-- [ ] **Step 4: Run test to verify it passes**
+  Implement `function` in `path/to/file.py`. Keep side effects at the edges; pure mapping logic in the body.
 
-Run: `pytest tests/path/test.py::test_name -v`
-Expected: PASS
+- [ ] **Step 4: Run tests to verify they pass**
+
+  Run: `pytest tests/path/test.py -v`
+  Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
-```bash
-git add tests/path/test.py src/path/file.py
-git commit -m "feat: add specific feature"
-```
+  ```bash
+  git add tests/path/test.py path/to/file.py
+  git commit -m "feat: add function for X"
+  ```
 ````
+
+**What goes inside steps:**
+
+- **Acceptable inline code:** data models (`@dataclass`, `pydantic.BaseModel`), schemas, fixture file content, illustrative 1-3 line snippets when prose alone is ambiguous. These are contracts.
+- **Not acceptable:** function bodies, control-flow blocks, error-handling specifics, step-by-step file rewrites with full source. These are implementation; the implementer decides.
+- **Contracts vs implementation, by example:** "Returns `Settings` with fields `MODEL`, `OPENAI_API_KEY`, `LOGFIRE_TOKEN`, `VAULT_PATH`, `LOG_LEVEL` defaulting to known values; cached via `lru_cache(maxsize=1)`" is a contract. The full pydantic-settings class body that produces that is implementation.
 
 ## No Placeholders
 
-Every step must contain the actual content an engineer needs. These are **plan failures** — never write them:
+Every step must contain the actual content the implementer needs to act. These remain **plan failures**; never write them:
+
 - "TBD", "TODO", "implement later", "fill in details"
-- "Add appropriate error handling" / "add validation" / "handle edge cases"
-- "Write tests for the above" (without actual test code)
-- "Similar to Task N" (repeat the code — the engineer may be reading tasks out of order)
-- Steps that describe what to do without showing how (code blocks required for code steps)
-- References to types, functions, or methods not defined in any task
+- "Add appropriate error handling" / "add validation" / "handle edge cases" (specify *which* errors, *which* inputs, *which* edges)
+- "Write tests for the above" (specify which behaviors the tests must verify and what they assert)
+- "Similar to Task N" (the implementer may read tasks out of order; restate the contract)
+- References to types, functions, methods, or reference docs that no task or doc defines
+
+What counts as "the actual content" depends on the step kind:
+
+- **Contract steps** (schemas, signatures, fixtures, test-behavior descriptions): code blocks required.
+- **Implementation steps** (function bodies, control flow): prose acceptance is fine; reach for a 1-3 line snippet only when it clarifies intent.
+- **Verification steps** (run a command, check output): exact command and expected outcome required.
 
 ## Remember
 - Exact file paths always
-- Complete code in every step — if a step changes code, show the code
+- Contracts in steps, not implementation: schemas, signatures, fixtures, and test-behavior assertions get code blocks; function bodies do not
 - Exact commands with expected output
 - DRY, YAGNI, TDD, frequent commits
+- Link to `docs/references/<name>.md` for cross-phase context; do not repeat it inline
 
 ## Self-Review
 
