@@ -83,6 +83,12 @@ The `scratch/` copies are the immutable "as handed over" snapshots. The `assista
 
 When the next phase is planned, the planner reads `assistant/docs/references/*` first to pick up implementer-side amendments, reconciles them into the `scratch/` canonical copy, then amends further as the new phase requires. References are alive across phases; plans are frozen per phase.
 
+**Edit policy after handoff.**
+
+- *Plans are frozen.* Once the implementer picks up a plan, neither repo's copy is edited again. The one exception is the implementer ticking tasks in place in `assistant/`. Dead citations and stale links in frozen plans are accepted as the cost of the freeze; do not chase them.
+- *Specs are edited only if load-bearing.* The bar: would this change affect a future re-planning decision? If no, drop it. Reviewer findings that don't meet the bar do not land on the spec, even if accurate.
+- *Implementer-authored references graduate to canonical.* If the implementer creates a new reference or substantially revises an existing one, the `assistant/` copy is canonical from that point. The planner cp's it back into `scratch/` at the start of the next planning cycle and the references-alive lifecycle continues from there.
+
 Architecture docs, ADRs, and NOTES.md sections in `assistant/` are authored fresh during implementation, derived from the progression plan + spec + plan + references quad. They are not copied out of `scratch/`.
 
 The progression plan tracks status by appending an **Artifacts** line to each phase section once that phase has spec and plan files:
