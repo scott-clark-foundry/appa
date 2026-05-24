@@ -59,32 +59,32 @@ Cross-phase context (file layout, event kinds, part taxonomy, reference shapes, 
 
 ```mermaid
 sequenceDiagram
-  participant C as Client (browser/CLI/Python)
-  participant H as FastAPI handler (/chat or /chat/sync)
+  participant C as Client
+  participant H as FastAPI handler
   participant R as transcripts.reader
   participant A as pydantic-ai Agent
   participant Rec as transcripts.recorder
-  participant W as vault.writer (lock + append)
+  participant W as vault.writer
   participant M as vault.manifest
 
-  C->>H: POST {thread_id, message, project?}
-  H->>R: read_conversation(project, thread_id)
-  R-->>H: list[ModelMessage] (server-canonical history)
-  H->>Rec: ensure_conversation_started(project, thread_id, client_meta)
-  Rec->>W: append(path, conversation_start line)  [first POST only]
-  Rec->>M: set(("transcripts", (project, thread_id)), entry)
-  H->>Rec: run_start(run_id, agent_name, model, instructions)
-  Rec->>W: append(path, run_start line)
-  H->>A: Agent.run(latest_user_msg, conversation_id=thread_id, message_history=...)
-  Note over A: streams text deltas back to client via AG-UI (if /chat)
-  A-->>H: result (sync) OR adapter exposes messages (AG-UI; Task 1 decides)
-  H->>Rec: append_messages(result.new_messages())
+  C->>H: POST thread_id, message, project
+  H->>R: read_conversation
+  R-->>H: list of ModelMessage as server-canonical history
+  H->>Rec: ensure_conversation_started
+  Rec->>W: append conversation_start line on first POST only
+  Rec->>M: set transcripts entry for project and thread_id
+  H->>Rec: run_start with run_id, agent_name, model, instructions
+  Rec->>W: append run_start line
+  H->>A: Agent.run with conversation_id and message_history
+  Note over A: streams text deltas back via AG-UI on /chat
+  A-->>H: result on sync, or adapter exposes messages on AG-UI per Task 1 branch
+  H->>Rec: append_messages from result.new_messages
   loop per new ModelMessage
-    Rec->>W: append(path, model_message line) + fsync
+    Rec->>W: append model_message line then fsync
   end
-  H->>Rec: run_end(status, duration_ms)
-  Rec->>W: append(path, run_end line)
-  H-->>C: streamed AG-UI events (or JSON {output}) -- unchanged
+  H->>Rec: run_end with status and duration_ms
+  Rec->>W: append run_end line
+  H-->>C: streamed AG-UI events or JSON output, unchanged wire format
 ```
 
 ### Module map
