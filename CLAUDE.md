@@ -1,4 +1,8 @@
 
+## Skills to keep loaded
+
+- `ai:building-pydantic-ai-agents` — load during any brainstorming or planning session on this project. Plans, specs, and reference docs constantly cite pydantic-ai surfaces (Agent.run signatures, ModelMessage union, AGUIAdapter flow); training data drifts, the skill carries the current API shape.
+
 ## Project context
 
 `scratch/` is a personal sandbox for portfolio and learning work toward an Agent Engineer role. It is not a single application; it is several adjacent things in one tree.
