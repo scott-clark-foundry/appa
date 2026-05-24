@@ -3,16 +3,14 @@ title: "Phase 1 transcripts: JSONL persistence + vault-write primitives + server
 summary: "Land the first persistence layer. Every pydantic-ai Agent.run() from /chat (AG-UI) and /chat/sync (plain JSON) appends to a per-conversation JSONL under vault/transcripts/{project}/{date}/. Stand up the cross-phase vault-write primitives (writer + manifest + asyncio.Lock + atomic-rename). Make the server canonical for conversation state: the handler reconstructs message_history from JSONL and passes it to Agent.run(conversation_id=thread_id, message_history=...)."
 status: draft
 author: planner
-phase: 1
-spec: ../specs/03-transcripts.md
-progression: "../plans/python-llm-app-progression.md#l1"
+phase: "1 of 10"
 branch: feat/transcripts
 started: 2026-05-23
 tags: [persistence, jsonl, vault-write-primitives, pydantic-ai, ag-ui, server-canonical]
 references:
-  - ../references/vault-write-primitives.md
-  - ../references/jsonl-transcript-format.md
-  - "(assistant/) docs/references/ag-ui-surface.md"
+  - docs/references/vault-write-primitives.md
+  - docs/references/jsonl-transcript-format.md
+  - docs/references/ag-ui-surface.md
 ---
 
 # Phase 1 transcripts: JSONL persistence + vault-write primitives + server-canonical state
@@ -26,9 +24,9 @@ references:
 **Tech stack.** No new top-level runtime deps. `python-ulid` for sortable event identifiers (small, single-purpose, MIT). pydantic-ai 1.102+ (already pinned). `asyncio.Lock` (stdlib). Settings already exposes `VAULT_PATH`; this phase adds `DEFAULT_PROJECT`. Cross-phase contracts: see References above.
 
 **References:**
-- `docs/references/vault-write-primitives.md` (this phase introduces it; the planner-seed contract; Task 1 refines)
-- `docs/references/jsonl-transcript-format.md` (this phase introduces it; Task 1 verifies and refines)
-- `assistant/docs/references/ag-ui-surface.md` (the AG-UI wire-shape ref shipped in phase 0 amendment; this phase reads it, does not amend it)
+- `docs/references/vault-write-primitives.md` (introduced this phase; planner-seed contract; Task 1 refines)
+- `docs/references/jsonl-transcript-format.md` (introduced this phase; Task 1 verifies and refines)
+- `docs/references/ag-ui-surface.md` (AG-UI wire-shape ref shipped in phase 0 amendment; this phase reads it, does not amend it)
 
 ---
 
@@ -37,7 +35,7 @@ references:
 > [!TIP] Goal
 > One JSONL file per conversation (`thread_id`). One line per pydantic-ai `ModelMessage`. Lifecycle markers (`conversation_start`, `run_start`, `run_end`) bracket each run. Both `/chat` and `/chat/sync` capture without changing their public wire format. The server reads back its own JSONL to seed `message_history` on the next POST. The vault-write primitives that ship here are the same ones phases 3, 4, 8, and 10 will reuse.
 
-> [!NOTE] Non-goals (carried verbatim from spec §"What's outside phase 1")
+> [!NOTE] Non-goals
 > - Markdown view of a JSONL. Future utility; deferred.
 > - `.aux/<sha256>` spill-to-file logic. Shape defined (`binary_ref`, `instructions_ref`) so later phases inherit; no writes to `.aux/` in phase 1.
 > - Edit-feedback from Obsidian.
@@ -151,24 +149,18 @@ tests/
 
 ## 04. Decisions
 
-Inherited from spec, not re-decided here:
+Locked in for this phase:
 
-- **D1** JSONL not markdown. Encoder writes JSONL. (Tasks 5-6 implement.)
-- **D2** Server-canonical history. Handler reads via `reader`, passes to `Agent.run(message_history=...)`. Latest client `messages[-1]` becomes the request body's user message; everything earlier is ignored. (Tasks 9-10 implement; Task 9 verifies.)
+- **D1** JSONL, not markdown, for transcripts. Encoder writes JSONL; a markdown view is a future utility. (Tasks 5-6 implement.)
+- **D2** Server-canonical conversation state. Handler reads via `reader`, passes to `Agent.run(message_history=...)`. Latest client `messages[-1]` becomes the request body's user message; everything earlier is ignored. (Tasks 9-10 implement; Task 9 verifies.)
 - **D3** Layout: `vault/transcripts/{project}/{date}/{started_at}-{thread8}.jsonl`. (Task 2 implements `paths.py`.)
-- **D4** Project from client (Python `project=` kwarg; sync wire `project` JSON field); server-side default from `Settings.DEFAULT_PROJECT`; regex-validated. **Decided here:** `DEFAULT_PROJECT` ships in phase 1 alongside the regex validator; we don't split it into a separate iteration. Same task, same diff. (Task 2 implements; Task 11 wires the client.)
+- **D4** Project from client (Python `project=` kwarg; sync wire `project` JSON field); server-side default from `Settings.DEFAULT_PROJECT`; regex-validated. `DEFAULT_PROJECT` ships this phase alongside the regex validator. (Task 2 implements; Task 11 wires the client.)
 - **D5** Per-message append granularity. Writer appends + fsyncs per line. (Task 3 implements.)
 - **D6** Cancellation = `run_end` with `status: "cancelled"`. AG-UI handler catches `asyncio.CancelledError`, queries `result.new_messages()` for whatever landed, appends those, then `run_end`. (Task 10 implements; Task 10 tests.)
 - **D7** Capture path differs by wire. `/chat/sync` uses `result.new_messages()` directly. `/chat` uses the manual AGUIAdapter flow per Task 1's findings. (Tasks 9-10.)
-- **D8** Vault-write primitives scope: writer + manifest + lock + paths. No provenance markers, no `.patch.md`, no `.aux/` writes in phase 1. (Tasks 2-4.)
-- **D9** `.aux/<sha256>` shape defined; phase 1 does not write to `.aux/`. The reference doc has the shape; the encoder treats `BinaryContent` inline (no spill). (Encoder contract in Task 6; round-trip test in Task 7.)
+- **D8** Vault-write primitives scope: writer + manifest + lock + paths. No provenance markers, no `.patch.md`, no `.aux/` writes this phase. (Tasks 2-4.)
+- **D9** `.aux/<sha256>` shape defined; this phase does not write to `.aux/`. The reference doc has the shape; the encoder treats `BinaryContent` inline (no spill). (Encoder contract in Task 6; round-trip test in Task 7.)
 - **D10** Subagent (sidechain) events in the same file as the parent. Phase 1 has no tools and therefore no sidechains; the encoder's envelope schema supports `is_sidechain: true` and the linkage fields but no production code path emits them. The decoder accepts them; the reader filters `is_sidechain == True` out of the returned `message_history`. (Tasks 5-7.)
-
-Decided in this plan (open questions from spec §"Open questions"):
-
-- **Plan-side**: `Settings.DEFAULT_PROJECT` ships in phase 1 (alongside the project regex validator). Not a separate scaffold-level iteration.
-- **Plan-side**: `02-post-scaffold-iteration.md` mirroring to `scratch/` is out of scope here. Surface it in §10 Open questions for the next planning round.
-- **Plan-side**: `CLAUDE.md` `NN` convention update (NN is no longer the phase number; it's the plan-sequence index) is out of scope. Surface in §10.
 
 ## 05. Changeset
 
@@ -207,7 +199,6 @@ Modified:
 - `pyproject.toml` (add `python-ulid` dependency)
 - `docs/references/vault-write-primitives.md` (set `last-verified`, pin pydantic-ai version, confirm `asyncio.Lock` choice and span attribute names)
 - `docs/references/jsonl-transcript-format.md` (set `last-verified`, paste `## Sample lines` for each `part_kind` probed, confirm discriminator strings)
-- `docs/plans/python-llm-app-progression.md` (update phase 1's `Artifacts.` line to include "merged" status after the squash; deferred to Task 13)
 - `assistant/CHANGELOG.md` (entry for `0.1.0`)
 - `assistant/README.md` (transcript-capture note in the chat section)
 - `assistant/NOTES.md` (new `## Transcript persistence + vault-write primitives` section)
@@ -220,10 +211,10 @@ Thirteen tasks plus preflight. Each task ends with a commit. Run on branch `feat
 
 Single goal: don't start a branch you'll have to abandon.
 
-- [ ] **PF1.** `assistant/docs/plans/02-post-scaffold-iteration.md` is merged to `main` on the remote (post-scaffold iteration shipped). `cd ../assistant && git log main --oneline -1` shows the iteration squash. _(scott)_
+- [ ] **PF1.** `docs/plans/02-post-scaffold-iteration.md` is merged to `main` on the remote (post-scaffold iteration shipped). `git log main --oneline -1` shows the iteration squash. _(scott)_
 - [ ] **PF2.** `python-ulid` import probe: `uv run python -c "import ulid; print(ulid.new())"` succeeds (or returns ModuleNotFoundError, in which case add it). If absent, `uv add python-ulid`, then re-probe. Commit on `main` (or fold into Task 2's first commit) as `chore(deps): add python-ulid for transcript event ids`. _(scott)_
 - [ ] **PF3.** Confirm pydantic-ai pin: `uv run python -c "import pydantic_ai; print(pydantic_ai.__version__)"` reports a version that satisfies `>=1.102,<2`. If not, raise the floor in `pyproject.toml` and `uv sync`. _(scott)_
-- [ ] **PF4.** Create the branch: `cd ../assistant && git checkout main && git pull && git checkout -b feat/transcripts`. _(scott)_
+- [ ] **PF4.** Create the branch: `git checkout main && git pull && git checkout -b feat/transcripts`. _(scott)_
 
 ### Task 1: Probe pydantic-ai surfaces; refine reference docs
 
@@ -241,7 +232,7 @@ Single goal: don't start a branch you'll have to abandon.
   - Replace the `part_kind` table strings with verified discriminator values from 1.3.
   - Replace `RequestUsage` field names with verified shape from 1.4.
   - Add a new top-level section `## AG-UI capture path` (placed between `## Reader policy` and `## Encode / decode round-trip`) recording the choice from 1.1. Two-paragraph max: the chosen path, and the rejected one with one sentence of why.
-  - Add `## Sample lines` at the end with one redacted JSONL line per `part_kind` (request: `user_prompt`, `system_prompt`, `tool_return`, `retry_prompt`, `builtin_tool_return`; response: `text`, `tool_call`, `thinking`, `builtin_tool_call`). For part kinds the probe didn't exercise live (`builtin_tool_*`), paste a hand-written example from the spec doc with a `# example, not probed` comment.
+  - Add `## Sample lines` at the end with one redacted JSONL line per `part_kind` (request: `user_prompt`, `system_prompt`, `tool_return`, `retry_prompt`, `builtin_tool_return`; response: `text`, `tool_call`, `thinking`, `builtin_tool_call`). For part kinds the probe didn't exercise live (`builtin_tool_*`), paste a hand-written example based on the part class shape with a `# example, not probed` comment.
   - Set `last-verified` to today's date; set `pydantic-ai-pin` to the verified installed minor-version range.
   _(scott)_
 - [ ] **1.6** Update `docs/references/vault-write-primitives.md`:
@@ -619,7 +610,7 @@ The reader does not consult the manifest for the file path; the caller (recorder
 - `test_roundtrip_thinking_part`: `ModelResponse` with `ThinkingPart("reasoning...")`; round-trip.
 - `test_roundtrip_retry_prompt`: `ModelRequest` with `RetryPromptPart(...)`; round-trip.
 - `test_roundtrip_system_prompt`: `ModelRequest` with `SystemPromptPart("you are helpful")`; round-trip.
-- `test_roundtrip_multimodal_user_prompt`: a `UserPromptPart` whose `content` is a list mixing `str` and `BinaryContent(data=b"...", media_type="image/png")`; round-trip; the binary content is inlined (no `.aux/` writes at phase 1 per spec §D9).
+- `test_roundtrip_multimodal_user_prompt`: a `UserPromptPart` whose `content` is a list mixing `str` and `BinaryContent(data=b"...", media_type="image/png")`; round-trip; the binary content is inlined (no `.aux/` writes this phase, per D9).
 
 The implementer adds further round-trip cases if Task 1's probe surfaced part kinds not in this list.
 
@@ -786,7 +777,7 @@ Handler flow:
 
 **Branch B** applies when Task 1 confirmed no such attribute exists. The handler taps the AG-UI event stream as it iterates: accumulate `TextMessageContent` deltas into a buffer and, on `RunFinished`, synthesize one `ModelResponse` with a single `TextPart` containing the assembled text, plus one `ModelRequest` carrying a `UserPromptPart` with `run_input.messages[-1].content`. Capture is degraded (no tool calls, no thinking parts, no usage stats), acceptable for phase 1 because there are no tools and no thinking-capable model wired by default. The reference doc records this trade-off.
 
-**Cancellation contract** (both branches): if the client disconnects mid-stream, `asyncio.CancelledError` propagates through the response generator. The handler must catch at the outer level, compute `duration_ms` from the captured start time, append whatever messages the capture surface can provide (Branch A: the result's available messages, possibly partial; Branch B: a synthetic `ModelResponse` with the partial assembled text if any was streamed before the cancel), append a `run_end` event with `status: "cancelled"`, then re-raise `CancelledError`. Per spec §"What's locked by the progression plan", cancellation must preserve the user message and any pre-cancellation assistant content; the user's `ModelRequest` must therefore be appended before the `run_end`.
+**Cancellation contract** (both branches): if the client disconnects mid-stream, `asyncio.CancelledError` propagates through the response generator. The handler must catch at the outer level, compute `duration_ms` from the captured start time, append whatever messages the capture surface can provide (Branch A: the result's available messages, possibly partial; Branch B: a synthetic `ModelResponse` with the partial assembled text if any was streamed before the cancel), append a `run_end` event with `status: "cancelled"`, then re-raise `CancelledError`. Cancellation must preserve the user message and any pre-cancellation assistant content; the user's `ModelRequest` must therefore be appended before the `run_end`.
 
 **Tested by:**
 
@@ -798,7 +789,7 @@ Handler flow:
 
 `tests/test_app_cancellation.py`:
 - `test_chat_ag_ui_cancellation_writes_run_end_with_status_cancelled`: drive the AG-UI request through `httpx.ASGITransport`; abort the stream mid-flight (close the response context); wait briefly; assert the JSONL has a `run_end` event with `status == "cancelled"`.
-- `test_chat_ag_ui_cancellation_preserves_user_message`: same setup; assert the `model_message` event for the user's request was written before the `run_end`. (Per spec: "Cancellation must preserve user message and any pre-cancellation assistant content".)
+- `test_chat_ag_ui_cancellation_preserves_user_message`: same setup; assert the `model_message` event for the user's request was written before the `run_end`.
 
 - [ ] **10.1** Re-read Task 1's `## AG-UI capture path` decision in `jsonl-transcript-format.md`. Pick Branch A or Branch B accordingly. _(scott)_
 - [ ] **10.2** Write `tests/test_app_chat_ag_ui_capture.py` and `tests/test_app_cancellation.py`. _(scott)_
@@ -838,14 +829,13 @@ Backwards-compatible: existing callers passing only `message` still work; `threa
 
 ### Task 12: Documentation
 
-**Files:** `assistant/README.md`, `assistant/CHANGELOG.md`, `assistant/NOTES.md`, `docs/plans/python-llm-app-progression.md` (in scratch/).
+**Files:** `assistant/README.md`, `assistant/CHANGELOG.md`, `assistant/NOTES.md`.
 
 **Contract.**
 
 - `assistant/README.md`: a new short section "Transcripts" after the chat section. Three sentences: where transcripts land (`vault/transcripts/...`); that the server is canonical (no client-side history bookkeeping needed); a pointer to `docs/references/jsonl-transcript-format.md` for the format. One code-block example showing two successive `assistant.client` calls with the same `thread_id` to demonstrate continuity.
 - `assistant/CHANGELOG.md`: `## [0.1.0] - <merge-date>` entry. Bullets: JSONL transcripts at `vault/transcripts/{project}/{date}/{thread8}.jsonl`; vault-write primitives (writer + manifest + lock + paths); server-canonical conversation state via `conversation_id == thread_id`; both `/chat` and `/chat/sync` capture; `Settings.DEFAULT_PROJECT`; `assistant.client.stream_chat` gains `thread_id` and `project` kwargs.
 - `assistant/NOTES.md`: new section `## Transcript persistence + vault-write primitives`. Concept: **server-canonical state.** Body: the client sends a thread_id and the latest user message; the server reads the JSONL for that thread_id and reconstructs the conversation; the client never needs to track history. Pointers to `assistant/persistence/vault/writer.py` (primitives), `assistant/persistence/transcripts/recorder.py` (orchestration), `docs/references/jsonl-transcript-format.md` (format), `docs/references/vault-write-primitives.md` (cross-phase contract). Single follow-up callout: phase 2's semantic recall walks every conversation's JSONL.
-- `docs/plans/python-llm-app-progression.md` (in scratch): update the phase 1 `Artifacts.` line to mark "merged in `assistant/` on <date>" once Task 13 squash-merges. Deferred to Task 13's last step.
 
 - [ ] **12.1** Edit `assistant/README.md`. _(scott)_
 - [ ] **12.2** Edit `assistant/CHANGELOG.md`. _(scott)_
@@ -854,7 +844,7 @@ Backwards-compatible: existing callers passing only `message` still work; `threa
 
 ### Task 13: Local CI + I5 verification + remote push + merge
 
-**Files:** none for code; `docs/plans/python-llm-app-progression.md` for the progression update.
+**Files:** none.
 
 **Contract.**
 
@@ -863,7 +853,6 @@ Backwards-compatible: existing callers passing only `message` still work; `threa
 - Manifest rebuild dry-run: write a small one-off script (do not commit) that calls `manifest.rebuild_from_vault(...)` against the dev vault and confirms the rebuilt manifest equals the on-disk one. This catches scanner bugs before they bite in production.
 - Push `feat/transcripts`. Remote CI passes on first push. If CI fails, fix and re-push; do not merge red.
 - Squash-merge to `main` via PR.
-- After merge, in `scratch/`: update the progression plan's `## Phase 1` `Artifacts.` line to include "merged YYYY-MM-DD in `assistant/`". Commit on scratch's main.
 
 - [ ] **13.1** Run the local CI sim; all five commands exit 0. _(scott)_
 - [ ] **13.2** Walk §08 Acceptance; tick every box. _(scott)_
@@ -872,7 +861,6 @@ Backwards-compatible: existing callers passing only `message` still work; `threa
 - [ ] **13.5** Push the branch: `git push -u origin feat/transcripts`. _(scott)_
 - [ ] **13.6** Wait for remote CI green. If red, fix and re-push. _(scott)_
 - [ ] **13.7** Squash-merge to `main` via PR. _(scott)_
-- [ ] **13.8** In `scratch/`: update progression plan's phase 1 Artifacts line; commit. _(scott)_
 
 ## 07. Risks
 
@@ -918,10 +906,9 @@ Backwards-compatible: existing callers passing only `message` still work; `threa
 - [ ] `assistant/README.md` has a "Transcripts" section. _(scott)_
 - [ ] `assistant/CHANGELOG.md` has a `[0.1.0]` entry. _(scott)_
 - [ ] `assistant/NOTES.md` has a `## Transcript persistence + vault-write primitives` section. _(scott)_
-- [ ] Squash-merge landed on `assistant/main`; remote CI green. _(scott)_
-- [ ] `docs/plans/python-llm-app-progression.md` (scratch) phase 1 Artifacts line updated with merge date. _(scott)_
+- [ ] Squash-merge landed on `main`; remote CI green. _(scott)_
 
-## 09. Out of scope (from spec §"What's outside phase 1")
+## 09. Out of scope
 
 These do not have tasks in this plan and will not block acceptance:
 
@@ -935,9 +922,7 @@ These do not have tasks in this plan and will not block acceptance:
 
 ## 10. Open questions (surface, do not resolve here)
 
-These are noted for the next planning round; they don't block phase 1 implementation.
+These don't block phase 1 implementation; the next phase's plan revisits them.
 
-- **Mirror `02-post-scaffold-iteration.md` to `scratch/docs/plans/`?** Currently scratch has `00-` and `01-`, this plan is `03-`. The gap is intentional (the iteration retrospective was implementer-authored) but worth resolving before phase 2 planning so the sequence reads cleanly.
-- **CLAUDE.md `NN` convention update.** CLAUDE.md says NN is the phase number; practice has NN as the plan-sequence index. The phase 1 plan filename is `03-transcripts.md`. Worth a CLAUDE.md amendment.
 - **Markdown view of JSONL utility.** A future `assistant transcripts view <thread_id>` that renders JSONL to readable markdown. Phase 5 (eval harness) may want this; otherwise defer to whoever needs it first.
-- **Provenance markers timing.** Master progression §10 placed these at phase 1; spec §D8 deferred to phase 3. Confirm in phase 3 planning that the memory writer is the right first consumer.
+- **Provenance markers timing.** Originally scoped for this phase but deferred to phase 3, where the memory writer becomes the first consumer. Confirm in phase 3 planning that this remains the right ordering.
