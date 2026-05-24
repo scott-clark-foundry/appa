@@ -68,22 +68,28 @@ sequenceDiagram
   participant M as vault.manifest
 
   C->>H: POST thread_id, message, project
-  H->>R: read_conversation
-  R-->>H: list of ModelMessage as server-canonical history
-  H->>Rec: ensure_conversation_started
+  H->>R: read_conversation(project, thread_id)
+  R-->>H: server-canonical history as list[ModelMessage]
+
+  H->>Rec: ensure_conversation_started(project, thread_id)
   Rec->>W: append conversation_start line on first POST only
   Rec->>M: set transcripts entry for project and thread_id
-  H->>Rec: run_start with run_id, agent_name, model, instructions
+
+  H->>Rec: run_start(run_id, agent_name, model, instructions)
   Rec->>W: append run_start line
-  H->>A: Agent.run with conversation_id and message_history
-  Note over A: streams text deltas back via AG-UI on /chat
-  A-->>H: result on sync, or adapter exposes messages on AG-UI per Task 1 branch
-  H->>Rec: append_messages from result.new_messages
+
+  H->>A: Agent.run(user_message, message_history, conversation_id)
+  Note over H,A: Handler or adapter maps agent stream events to AG-UI events on /chat
+  A-->>H: final result with new ModelMessages
+
+  H->>Rec: append_messages(result.new_messages())
   loop per new ModelMessage
     Rec->>W: append model_message line then fsync
   end
-  H->>Rec: run_end with status and duration_ms
+
+  H->>Rec: run_end(run_id, status, duration_ms)
   Rec->>W: append run_end line
+
   H-->>C: streamed AG-UI events or JSON output, unchanged wire format
 ```
 
