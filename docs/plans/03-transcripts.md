@@ -773,70 +773,20 @@ Handler flow:
 
 **Contract.**
 
-`/chat` drops from `AGUIAdapter.dispatch_request` to the manual flow chosen in Task 1's `## AG-UI capture path` section of the reference doc. Two branches:
+`/chat` drops from `AGUIAdapter.dispatch_request` to the manual flow chosen in Task 1's `## AG-UI capture path` section of the reference doc. The handler must satisfy this behavioral contract regardless of which branch Task 1 selected:
 
-**Branch A (Task 1 confirmed `adapter.result` is exposed after `run_stream` drains):**
+- Resolve `project` from the AG-UI request body. The AG-UI spec leaves the carrier open; the implementer picks among `RunAgentInput.context`, a top-level body field, or a query param, and documents the choice in `NOTES.md`. Apply `validate_project_name`; reject with 422 on failure. Fall back to `Settings.DEFAULT_PROJECT` when absent.
+- Use `run_input.thread_id` as the `conversation_id`. Call `recorder.ensure_conversation_started` to obtain the file path and write the `conversation_start` event on first POST for this thread.
+- Read server-canonical history via `reader.read_conversation(vault_root, project, thread_id)`. Pass that history to the agent as `message_history=...`. The new user turn is `run_input.messages[-1]`; the earlier client-supplied messages are ignored.
+- Append a `run_start` event before driving the agent; record the run's start time for `duration_ms` measurement.
+- Drive the agent through the manual `AGUIAdapter` flow (`build_run_input` → `AGUIAdapter(agent, run_input, accept)` → `.run_stream()` → `.encode_stream()`) so AG-UI SSE events stream to the client unchanged. The wire format of `/chat` is unchanged from phase 0; phase 0's smoke tests must still pass.
+- After the response body fully drains, capture the run's `ModelMessage` list (mechanism per branch, below), append one `model_message` event per message, then append a `run_end` event with `status: "completed"` and the measured `duration_ms`. FastAPI's `BackgroundTask` attached to the `StreamingResponse` is one mechanism that fits; the implementer may choose another that gives the same post-drain semantics.
 
-```python
-@app.post("/chat")
-async def chat(request, agent=..., recorder=..., settings=...):
-    body = await request.body()
-    run_input = AGUIAdapter.build_run_input(body)
-    project = validate_project_name(<from body or default>)
-    thread_id = run_input.thread_id
-    path = await recorder.ensure_conversation_started(project=project, conversation_id=thread_id)
-    history, _ = reader.read_conversation(settings.VAULT_PATH, project, thread_id)
-    # Server-canonical: build a NEW run_input whose messages = [latest user msg only]
-    # but call agent through AGUIAdapter so AG-UI events still flow.
-    # We pass message_history via Agent.run kwargs by driving the adapter to
-    # call agent.run(...) with our kwargs. If the adapter API forces messages
-    # through run_input, we strip messages to the last one and rely on
-    # message_history to carry the rest.
-    accept = request.headers.get("accept", "text/event-stream")
-    adapter = AGUIAdapter(agent=agent, run_input=run_input, accept=accept)
-    run_uuid = await recorder.run_start(path=path, run_id=<run_input.run_id or new>, ...)
-    started_at = datetime.now(tz=UTC)
-    try:
-        event_stream = adapter.run_stream(
-            conversation_id=thread_id,
-            message_history=history,
-        )  # pass kwargs through if the API accepts them; else fall back to Branch B
-        sse_stream = adapter.encode_stream(event_stream)
-        # Wrap StreamingResponse so we can run a finally block after drain.
-        async def wrapped():
-            try:
-                async for chunk in sse_stream:
-                    yield chunk
-            except asyncio.CancelledError:
-                # Drop into cancellation path (below)
-                raise
-        response = StreamingResponse(wrapped(), media_type=accept)
-        # After the response body has fully drained, the route returns;
-        # we need a different hook to capture messages. Use a BackgroundTask
-        # attached to the response that runs after send.
-        async def finalize_completed():
-            msgs = adapter.result.new_messages()  # the path Task 1 confirmed
-            await recorder.append_messages(path=path, run_id=..., messages=msgs, parent_uuid=run_uuid, is_sidechain=False)
-            await recorder.run_end(path=path, run_id=..., status="completed", duration_ms=..., parent_uuid=..., is_sidechain=False)
-        response.background = BackgroundTask(finalize_completed)
-        return response
-    except asyncio.CancelledError:
-        # See cancellation contract below
-        ...
-```
+**Branch A** applies when Task 1 confirmed the `AGUIAdapter` instance exposes the just-completed run's messages after `run_stream()` drains (whether named `.result.all_messages()`, `.result.new_messages()`, `.last_run`, or another shape). The capture surface is that single call. This is the simpler path: usage stats, tool calls, thinking parts, and the full part taxonomy land in the JSONL intact.
 
-**Branch B (Task 1 confirmed `adapter.result` is NOT exposed):**
+**Branch B** applies when Task 1 confirmed no such attribute exists. The handler taps the AG-UI event stream as it iterates: accumulate `TextMessageContent` deltas into a buffer and, on `RunFinished`, synthesize one `ModelResponse` with a single `TextPart` containing the assembled text, plus one `ModelRequest` carrying a `UserPromptPart` with `run_input.messages[-1].content`. Capture is degraded (no tool calls, no thinking parts, no usage stats), acceptable for phase 1 because there are no tools and no thinking-capable model wired by default. The reference doc records this trade-off.
 
-Tap the event stream. Iterate `adapter.run_stream()` events; for each `TextMessageContent` event accumulate the delta into a buffer; on `RunFinished` emit one synthetic `ModelResponse` containing the assembled `TextPart`. For the user message, emit one synthetic `ModelRequest` containing a `UserPromptPart` whose content is `run_input.messages[-1].content` (the latest user turn). This is a degraded capture compared to Branch A (we don't see tool calls, thinking parts, or usage stats), but phase 1 has no tools and no thinking-capable model wired by default, so the loss is acceptable. The reference doc records this trade-off.
-
-Cancellation contract (both branches):
-
-When the client disconnects, `asyncio.CancelledError` propagates through the response generator. The handler catches at the outer level and:
-
-1. Computes `duration_ms` from `started_at` to now.
-2. Calls `recorder.append_messages` with whatever the capture surface can provide (Branch A: `adapter.result.new_messages()` if non-None; Branch B: a synthetic ModelResponse with the partial assembled text, if any).
-3. Calls `recorder.run_end(status="cancelled", duration_ms=..., ...)`.
-4. Re-raises `CancelledError` (FastAPI swallows it cleanly; the client already disconnected).
+**Cancellation contract** (both branches): if the client disconnects mid-stream, `asyncio.CancelledError` propagates through the response generator. The handler must catch at the outer level, compute `duration_ms` from the captured start time, append whatever messages the capture surface can provide (Branch A: the result's available messages, possibly partial; Branch B: a synthetic `ModelResponse` with the partial assembled text if any was streamed before the cancel), append a `run_end` event with `status: "cancelled"`, then re-raise `CancelledError`. Per spec §"What's locked by the progression plan", cancellation must preserve the user message and any pre-cancellation assistant content; the user's `ModelRequest` must therefore be appended before the `run_end`.
 
 **Tested by:**
 
