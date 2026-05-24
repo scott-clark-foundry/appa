@@ -135,6 +135,8 @@ One repo (`assistant/`), one main branch, one persistent product. The portfolio 
 
 **Merge.** Main has browsable transcripts.
 
+**Artifacts.** [Spec](../specs/03-transcripts.md) · References: [vault-write primitives](../references/vault-write-primitives.md), [JSONL transcript format](../references/jsonl-transcript-format.md)
+
 <a id="l2"></a>
 ### Phase 2 · `feat/semantic-recall`
 
