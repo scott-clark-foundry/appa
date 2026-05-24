@@ -1,7 +1,7 @@
 ---
 title: "JSONL transcript format"
-status: seed — refine in plan 03 Task N against the live import
-introduced: phase 1 (`docs/specs/03-transcripts.md`)
+status: draft
+introduced: phase 1
 pydantic-ai-pin: ">=1.102,<2"  # matches assistant/docs/references/ag-ui-surface.md
 consumers: phase 1 (write+read), phase 2 (read for indexing), phase 3 (subscribe via bus), phase 5 (replay), phase 8 (read for pattern mining), phase 10 (read)
 last-verified: null
@@ -10,9 +10,6 @@ last-verified: null
 # JSONL transcript format
 
 The on-disk record of every pydantic-ai `Agent.run()` the assistant performs. One file per conversation (`thread_id`), append-only, one JSON object per line. Every event from a run lands here; replay of a conversation is a matter of streaming the JSONL.
-
-> [!NOTE] Status
-> Planner seed. Phase 1's plan refines this doc against the live pydantic-ai 1.102 surface: confirms exact `part_kind` discriminator values, confirms `RequestUsage` field names, captures a redacted real-encoded sample of every part kind under test. `last-verified` is set when the implementer finishes refinement.
 
 ## Why this format
 
@@ -161,7 +158,7 @@ Written when `Agent.run()` returns (clean) or raises `asyncio.CancelledError` (m
 }
 ```
 
-`status` is `"completed"` | `"cancelled"` | `"errored"`. Cancellation produces a `run_end` with `status: "cancelled"`; the `model_message` events that landed before the cancel are present in the file (per the per-message append granularity in `docs/specs/03-transcripts.md` §D5).
+`status` is `"completed"` | `"cancelled"` | `"errored"`. Cancellation produces a `run_end` with `status: "cancelled"`; the `model_message` events that landed before the cancel are present in the file (per-message append granularity guarantees no in-flight loss).
 
 ## Envelope schema (every line)
 
@@ -171,7 +168,7 @@ Written when `Agent.run()` returns (clean) or raises `asyncio.CancelledError` (m
 | `parent_uuid` | str \| null | Previous event in causal chain. `null` only on `conversation_start`. |
 | `kind` | `"conversation_start"` \| `"run_start"` \| `"model_message"` \| `"run_end"` | Discriminator. |
 | `timestamp` | str (ISO 8601, UTC, microsecond) | When the event was recorded. |
-| `conversation_id` | str | pydantic-ai's conversation_id; equals AG-UI thread_id (see `docs/specs/03-transcripts.md` §D2). |
+| `conversation_id` | str | pydantic-ai's conversation_id; equals AG-UI thread_id. |
 | `run_id` | str | pydantic-ai's run_id. Absent only on `conversation_start`. |
 | `is_sidechain` | bool | True for subagent events. Absent only on `conversation_start`. |
 | `parent_run_id` | str (sidechain only) | The outer run that called the tool. |
@@ -196,7 +193,7 @@ Serialized `ModelRequest` or `ModelResponse` from pydantic-ai. Use `pydantic_ai.
 
 ### Request-only fields
 
-- `instructions`: str. The (potentially dynamic) instructions for this request. Per `docs/specs/03-transcripts.md` §D9, may swap to `instructions_ref` when large.
+- `instructions`: str. The (potentially dynamic) instructions for this request. May swap to `instructions_ref` when large.
 
 ### Response-only fields
 
@@ -279,14 +276,3 @@ The integrity guarantee phase 1 commits to: for any `messages = result.all_messa
 - **Phase 5 (replay).** Eval harness reads a conversation's JSONL, optionally trims to a prefix, and replays via `Agent.run(message_history=...)`. The encode/decode round-trip lock-in is exactly what makes this safe.
 - **Phase 8 (read for pattern mining).** Skill drafter walks JSONL across conversations, extracts tool-call patterns, drafts skills.
 - **Phase 10 (read).** Self-improvement loop reads JSONL for self-analysis.
-
-## Refinement points for the implementer
-
-When phase 1's plan implements this:
-
-1. Confirm exact `part_kind` discriminator strings (`"user_prompt"` vs `"user-prompt"`, etc.) from `ModelRequestPart.__discriminator__` and `ModelResponsePart.__discriminator__` (or wherever pydantic-ai stores the type tags).
-2. Confirm `RequestUsage` field names: `input_tokens` / `output_tokens` / `total_tokens` or a different shape.
-3. Confirm `ModelMessage` serialization path. Use whichever of these round-trips cleanly: `ModelMessagesTypeAdapter` if exposed, `model_dump(mode="json")` + discriminated `model_validate`, or pydantic-ai's own to/from-JSON helpers.
-4. Capture a redacted real-encoded sample of every `part_kind` exercised under test, paste under a `## Sample lines` heading in this doc.
-5. Set `last-verified` to the implementation date; record the pydantic-ai version range used.
-6. If pydantic-ai 1.103+ adds new part kinds (e.g., audio output, video), append rows to the part taxonomy.

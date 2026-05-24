@@ -1,7 +1,7 @@
 ---
 title: "Vault-write primitives"
-status: seed — refine in plan 03 Task N against the live import
-introduced: phase 1 (`docs/specs/03-transcripts.md`)
+status: draft
+introduced: phase 1
 consumers: phase 1 (transcripts), phase 3 (memory), phase 4 (SKILL.md), phase 8 (skill drafts), phase 10 (self-improvement)
 last-verified: null
 ---
@@ -9,9 +9,6 @@ last-verified: null
 # Vault-write primitives
 
 Cross-phase contract for **any** file that goes into the vault. Defined once at phase 1; every later phase that writes uses these primitives — never the raw filesystem. The primitives are protocol-agnostic: they take bytes (or lines) and write them safely. They don't know about JSONL, markdown frontmatter, or any specific content shape.
-
-> [!NOTE] Status
-> Planner seed. Phase 1's plan refines this doc against the live implementation: confirms function signatures, exact lock semantics, exact manifest schema, and pins the pydantic-ai / fastapi / pydantic-settings versions touched. `last-verified` is set when the implementer finishes refinement.
 
 ## Purpose
 
@@ -140,15 +137,5 @@ These hold across every consumer phase. Violating any of them is a phase-level r
 
 - **Content shape.** JSONL framing, markdown frontmatter conventions, Skills-spec frontmatter — all live in the consumer-phase docs or in `jsonl-transcript-format.md`.
 - **Read APIs.** This doc is the *write* surface. The JSONL reader for transcripts is documented in `jsonl-transcript-format.md`. Memory / skills readers come in their own phase docs.
-- **Provenance markers** (`^[inferred]`, `^[ambiguous]`, frontmatter ratios). Introduced by master progression §10 as a phase-1 deliverable; deferred to phase 3 (see `docs/specs/03-transcripts.md` §D8) where the first consumer exists.
-- **`.patch.md` proposed-diff primitive.** Master progression §10 mentions it; deferred to first consumer (phase 3+ memory amendments).
-
-## Refinement points for the implementer
-
-When phase 1's plan implements this:
-
-1. Confirm `asyncio.Lock` is the right primitive (vs `anyio.Lock` if pydantic-ai uses anyio internally). Likely `asyncio.Lock` since FastAPI is asyncio-native; verify.
-2. Confirm Logfire span attribute names against the existing `assistant/logging_setup.py` conventions (matches Logfire's `gen_ai.*` and `vault.*` namespacing if anything similar already exists).
-3. Decide where the writer module lives. `assistant/persistence/vault/writer.py` is the planner's lean; the implementer may regroup if a clearer boundary emerges during build.
-4. Confirm the manifest JSON schema for at least the `transcripts` kind. Add cross-references in this doc to the JSONL format doc.
-5. Set `last-verified` in this doc's frontmatter to the implementation date; record the pydantic-ai version range used.
+- **Provenance markers** (`^[inferred]`, `^[ambiguous]`, frontmatter ratios). Deferred to phase 3 where the first consumer exists.
+- **`.patch.md` proposed-diff primitive.** Deferred to first consumer (phase 3+ memory amendments).

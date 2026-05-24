@@ -2,7 +2,6 @@
 title: "Phase 1 transcripts: JSONL persistence + vault-write primitives + server-canonical state"
 summary: "Land the first persistence layer. Every pydantic-ai Agent.run() from /chat (AG-UI) and /chat/sync (plain JSON) appends to a per-conversation JSONL under vault/transcripts/{project}/{date}/. Stand up the cross-phase vault-write primitives (writer + manifest + asyncio.Lock + atomic-rename). Make the server canonical for conversation state: the handler reconstructs message_history from JSONL and passes it to Agent.run(conversation_id=thread_id, message_history=...)."
 status: draft
-author: planner
 phase: "1 of 10"
 branch: feat/transcripts
 started: 2026-05-23
@@ -19,12 +18,12 @@ references:
 
 **Goal.** Every pydantic-ai `Agent.run()` produces a replay-grade JSONL record under `vault/transcripts/{project}/{YYYY-MM-DD}/{started_at}-{thread8}.jsonl`. Both `/chat` (AG-UI streaming) and `/chat/sync` (plain JSON) capture. The server is canonical for conversation history.
 
-**Architecture.** Two new sub-packages in `assistant/`. `persistence/vault/` provides protocol-agnostic primitives (`writer.append`, `writer.write_replace`, `manifest`, `paths`, module-level `asyncio.Lock`). `persistence/transcripts/` provides the JSONL-specific surface (envelope models, encoder, decoder, reader, recorder). The chat handlers read history via the reader, run the agent with `conversation_id=thread_id` and `message_history=...`, and append events via the recorder. The AG-UI handler drops to the manual `AGUIAdapter` flow (pre-authorized by `assistant/docs/plans/01-ag-ui-migration.md` ADR D4) so the recorder can observe each run's messages.
+**Architecture.** Two new sub-packages in `assistant/`. `persistence/vault/` provides protocol-agnostic primitives (`writer.append`, `writer.write_replace`, `manifest`, `paths`, module-level `asyncio.Lock`). `persistence/transcripts/` provides the JSONL-specific surface (envelope models, encoder, decoder, reader, recorder). The chat handlers read history via the reader, run the agent with `conversation_id=thread_id` and `message_history=...`, and append events via the recorder. The AG-UI handler drops to the manual `AGUIAdapter` flow (pre-authorized by `docs/plans/01-ag-ui-migration.md` ADR D4) so the recorder can observe each run's messages.
 
 **Tech stack.** No new top-level runtime deps. `python-ulid` for sortable event identifiers (small, single-purpose, MIT). pydantic-ai 1.102+ (already pinned). `asyncio.Lock` (stdlib). Settings already exposes `VAULT_PATH`; this phase adds `DEFAULT_PROJECT`. Cross-phase contracts: see References above.
 
 **References:**
-- `docs/references/vault-write-primitives.md` (introduced this phase; planner-seed contract; Task 1 refines)
+- `docs/references/vault-write-primitives.md` (introduced this phase; Task 1 verifies and refines)
 - `docs/references/jsonl-transcript-format.md` (introduced this phase; Task 1 verifies and refines)
 - `docs/references/ag-ui-surface.md` (AG-UI wire-shape ref shipped in phase 0 amendment; this phase reads it, does not amend it)
 
@@ -32,20 +31,19 @@ references:
 
 ## 01. Intent
 
-> [!TIP] Goal
-> One JSONL file per conversation (`thread_id`). One line per pydantic-ai `ModelMessage`. Lifecycle markers (`conversation_start`, `run_start`, `run_end`) bracket each run. Both `/chat` and `/chat/sync` capture without changing their public wire format. The server reads back its own JSONL to seed `message_history` on the next POST. The vault-write primitives that ship here are the same ones phases 3, 4, 8, and 10 will reuse.
+One JSONL file per conversation (`thread_id`). One line per pydantic-ai `ModelMessage`. Lifecycle markers (`conversation_start`, `run_start`, `run_end`) bracket each run. Both `/chat` and `/chat/sync` capture without changing their public wire format. The server reads back its own JSONL to seed `message_history` on the next POST. The vault-write primitives that ship here are the same ones phases 3, 4, 8, and 10 will reuse.
 
-> [!NOTE] Non-goals
-> - Markdown view of a JSONL. Future utility; deferred.
-> - `.aux/<sha256>` spill-to-file logic. Shape defined (`binary_ref`, `instructions_ref`) so later phases inherit; no writes to `.aux/` in phase 1.
-> - Edit-feedback from Obsidian.
-> - Multi-process write coordination.
-> - Pruning, archival, compaction.
-> - CLI subcommands (`assistant transcripts list / replay / export`).
-> - Provenance markers (`^[inferred]`, `^[ambiguous]`). Deferred to phase 3.
+**Non-goals:**
 
-> [!IMPORTANT] Key insight
-> The two wires (AG-UI streaming vs sync JSON) need different capture mechanics but share the same recorder. Sync is trivial: `result = await agent.run(...)` then `result.new_messages()` is right there. AG-UI is the hard one: `AGUIAdapter.dispatch_request` returns a `StreamingResponse` with no exposed result object, so phase 1 drops to the manual `build_run_input` / `AGUIAdapter(...).run_stream()` / `.encode_stream()` flow. Whether that manual flow exposes a `result.all_messages()` after the stream completes is what Task 1 probes; the answer decides Task 10's contract.
+- Markdown view of a JSONL. Future utility; deferred.
+- `.aux/<sha256>` spill-to-file logic. Shape defined (`binary_ref`, `instructions_ref`) so later phases inherit; no writes to `.aux/` in phase 1.
+- Edit-feedback from Obsidian.
+- Multi-process write coordination.
+- Pruning, archival, compaction.
+- CLI subcommands (`assistant transcripts list / replay / export`).
+- Provenance markers (`^[inferred]`, `^[ambiguous]`). Deferred to phase 3.
+
+The two wires (AG-UI streaming vs sync JSON) need different capture mechanics but share the same recorder. Sync is trivial: `result = await agent.run(...)` then `result.new_messages()` is right there. AG-UI is the hard one: `AGUIAdapter.dispatch_request` returns a `StreamingResponse` with no exposed result object, so phase 1 drops to the manual `build_run_input` / `AGUIAdapter(...).run_stream()` / `.encode_stream()` flow. Whether that manual flow exposes a `result.all_messages()` after the stream completes is what Task 1 probes; the answer decides Task 10's contract.
 
 ## 02. Tech stack
 
@@ -143,7 +141,7 @@ tests/
 
 - **VAULT_PATH**: every test builds `Settings(_env_file=None, VAULT_PATH=tmp_path / "vault")` via `make_test_settings` and passes through `build_app(settings)`. The writer reads vault root once at startup via `paths.resolve_vault_root()`; no global state to reset between tests because each test gets a fresh app instance.
 - **Clock**: `recorder.run_start(..., now=...)` accepts an optional `datetime` for deterministic timestamps; production callers pass `datetime.now(timezone.utc)`. The encoder receives ISO strings, not `datetime`s.
-- **UUID/ULID factory**: `recorder` accepts an optional `id_factory: Callable[[], str]` defaulting to `ulid.new().str`. Tests inject a counter-backed factory.
+- **UUID/ULID factory**: `recorder` accepts an optional `event_id_factory: Callable[[], str]` defaulting to `ulid.new().str`. Tests inject a counter-backed factory.
 - **Agent override**: phase 0's `app.dependency_overrides[get_agent] = lambda: Agent(model=TestModel(), output_type=str)` continues to work; the recorder is wired through the handler, not through the Agent.
 - **httpx.ASGITransport**: full request-cycle tests run the FastAPI app in-memory; no real network or external model calls.
 
@@ -205,8 +203,6 @@ Modified:
 
 ## 06. Tasks
 
-Thirteen tasks plus preflight. Each task ends with a commit. Run on branch `feat/transcripts` off `main`. Squash-merge to `main` when remote CI is green and every box in §08 Acceptance is ticked.
-
 ### Preflight (do before branching)
 
 Single goal: don't start a branch you'll have to abandon.
@@ -222,11 +218,9 @@ Single goal: don't start a branch you'll have to abandon.
 
 **Contract.** By end of task, both reference docs have `last-verified` set to today's date; `jsonl-transcript-format.md` has a `## Sample lines` section with one redacted sample per probed `part_kind`; the `part_kind` discriminator strings in `## Part taxonomy` match `ModelRequestPart` / `ModelResponsePart` discriminator values exactly; the `RequestUsage` field names match `RequestUsage.model_fields.keys()`; one of the two AG-UI capture paths is selected and documented in `jsonl-transcript-format.md` under a new `## AG-UI capture path` heading (either "adapter exposes result.all_messages() after run_stream completes" or "event-stream tap + reconstruct from text-content events").
 
-**The investigation has four probes.** Each probe is a one-off Python script run with `uv run python -c "..."` (the implementer may write a temporary file if the script grows past a few lines; the file is not committed). The findings get written into the reference docs; the probe scripts themselves do not.
-
 - [ ] **1.1** Probe `AGUIAdapter` result access. Build an inline FastAPI app, wire `/probe` to the manual flow (`build_run_input` → `AGUIAdapter(agent, run_input, accept)` → `.run_stream()` → `.encode_stream()`), drive it with a TestModel-backed Agent, POST a minimal `RunAgentInput`, drain the SSE stream, then inspect `adapter.result` (the instance after `.run_stream()` completes). Record: does the adapter instance expose `.result.all_messages()`? Does it expose anything equivalent (`.messages`, `.last_run`, etc.)? Capture the output in chat for the user to confirm before deciding the path. _(scott)_
 - [ ] **1.2** Probe `ModelMessage` round-trip. In a Python REPL or script: build a small `ModelRequest` (with a `UserPromptPart`) and a small `ModelResponse` (with a `TextPart`); serialize via `msg.model_dump(mode="json")`; deserialize via `ModelRequest.model_validate(...)` / `ModelResponse.model_validate(...)`, discriminating on the `"kind"` field. Confirm `decoded == original` (pydantic equality). If `ModelMessagesTypeAdapter` is exported from `pydantic_ai.messages`, use that instead and record the import path. _(scott)_
-- [ ] **1.3** Probe `part_kind` discriminator strings. `from pydantic_ai.messages import ModelRequestPart, ModelResponsePart` then print the literal discriminator values for every part class (the implementer locates them via `__pydantic_fields__["part_kind"]` or `__discriminator_values__` (pydantic-ai's exact attribute name varies; find the live one)). Expect strings like `"user-prompt"` vs `"user_prompt"`; the seed reference doc guessed `user_prompt` snake-case but the wire may differ. _(scott)_
+- [ ] **1.3** Probe `part_kind` discriminator strings. `from pydantic_ai.messages import ModelRequestPart, ModelResponsePart` then print the literal discriminator values for every part class (the implementer locates them via `__pydantic_fields__["part_kind"]` or `__discriminator_values__` (pydantic-ai's exact attribute name varies; find the live one)). Expect strings like `"user-prompt"` vs `"user_prompt"`; the reference doc currently lists `user_prompt` snake-case but the wire may differ. _(scott)_
 - [ ] **1.4** Probe `RequestUsage` shape. `from pydantic_ai.usage import RequestUsage; print(RequestUsage.model_fields.keys())`. Confirm `input_tokens` / `output_tokens` / `total_tokens` or capture the actual names. _(scott)_
 - [ ] **1.5** Update `docs/references/jsonl-transcript-format.md`:
   - Replace the `part_kind` table strings with verified discriminator values from 1.3.
@@ -351,7 +345,7 @@ The writer does not know about manifest. Manifest updates happen at the recorder
 
 - [ ] **3.1** Write `tests/test_vault_writer.py` with the six test cases. _(scott)_
 - [ ] **3.2** Run the tests. Expect `ImportError` for `assistant.persistence.vault.writer`. _(scott)_
-- [ ] **3.3** Implement `assistant/persistence/vault/writer.py` to satisfy the contract. Use `asyncio.to_thread` for the actual file I/O (open/write/fsync are blocking; the lock + the thread offload give correct serialization without blocking the event loop). _(scott)_
+- [ ] **3.3** Implement `assistant/persistence/vault/writer.py` to satisfy the contract. _(scott)_
 - [ ] **3.4** Run `uv run pytest tests/test_vault_writer.py -v`. All six pass. _(scott)_
 - [ ] **3.5** Run full suite + ruff + mypy. Clean. _(scott)_
 - [ ] **3.6** Commit: `feat(persistence): vault writer with append, write_replace, and module-level Lock`. _(scott)_
@@ -497,7 +491,7 @@ Field names and the discriminator value strings match `docs/references/jsonl-tra
 ```python
 def encode_conversation_start(
     *, conversation_id: str, project: str, client_name: str, client_version: str,
-    started_at: datetime, id_factory: Callable[[], str],
+    started_at: datetime, event_id_factory: Callable[[], str],
 ) -> str:
     """Build a ConversationStartEvent; return its JSON line (no trailing newline).
     The writer adds the newline."""
@@ -505,7 +499,7 @@ def encode_conversation_start(
 def encode_run_start(
     *, parent_uuid: str, conversation_id: str, run_id: str, is_sidechain: bool,
     agent_name: str, model: str, instructions: str, now: datetime,
-    id_factory: Callable[[], str],
+    event_id_factory: Callable[[], str],
     parent_run_id: str | None = None, triggering_tool_use_id: str | None = None,
 ) -> str:
     """Build a RunStartEvent. Computes instructions_sha256 = sha256(instructions.encode()).hexdigest().
@@ -514,7 +508,7 @@ def encode_run_start(
 
 def encode_model_message(
     *, parent_uuid: str, conversation_id: str, run_id: str, is_sidechain: bool,
-    message: ModelMessage, now: datetime, id_factory: Callable[[], str],
+    message: ModelMessage, now: datetime, event_id_factory: Callable[[], str],
 ) -> str:
     """Build a ModelMessageEvent wrapping `message`. The payload uses
     message.model_dump(mode="json") under the hood via pydantic."""
@@ -522,7 +516,7 @@ def encode_model_message(
 def encode_run_end(
     *, parent_uuid: str, conversation_id: str, run_id: str, is_sidechain: bool,
     status: Literal["completed", "cancelled", "errored"],
-    duration_ms: int, now: datetime, id_factory: Callable[[], str],
+    duration_ms: int, now: datetime, event_id_factory: Callable[[], str],
 ) -> str:
     """Build a RunEndEvent."""
 ```
@@ -646,7 +640,7 @@ class TranscriptRecorder:
         client_name: str = "assistant",
         client_version: str,            # from importlib.metadata.version("assistant")
         clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
-        id_factory: Callable[[], str] = lambda: ulid.new().str,
+        event_id_factory: Callable[[], str] = lambda: ulid.new().str,
     ) -> None: ...
 
     async def ensure_conversation_started(
@@ -685,7 +679,7 @@ The recorder calls `writer.append` once per line. It also updates the manifest e
 - `test_recorder_creates_file_on_first_run`: call `ensure_conversation_started` then `run_start` then `append_messages([request, response])` then `run_end(status="completed", ...)`; the file at the returned path contains exactly 5 lines in order (conversation_start, run_start, model_message×2, run_end), and each line parses via `decode_line`.
 - `test_recorder_does_not_duplicate_conversation_start`: call `ensure_conversation_started` twice for the same (project, thread_id); file has exactly one `conversation_start` line.
 - `test_recorder_uuid_chain_is_correct`: assert each line's `parent_uuid` equals the previous line's `uuid` (causal chain).
-- `test_recorder_id_factory_is_used`: pass a counter-backed `id_factory`; assert the uuids in the file match the counter sequence.
+- `test_recorder_event_id_factory_is_used`: pass a counter-backed `event_id_factory`; assert the uuids in the file match the counter sequence.
 - `test_recorder_clock_is_used`: pass a frozen clock returning `2026-05-23T14:30:12+00:00`; assert every event's `timestamp` is exactly that ISO string.
 - `test_recorder_run_count_increments_in_manifest`: after two complete runs, the manifest entry for (project, thread_id) has `extra["run_count"] == 2`.
 - `test_recorder_handles_cancelled_status`: call `run_end(status="cancelled", duration_ms=...)`; the run_end event has `status == "cancelled"`.
@@ -720,18 +714,7 @@ Response shape gains a `thread_id` field so the client can pass it back next tur
 {"output": "...", "thread_id": "..."}
 ```
 
-Handler flow:
-
-1. Resolve `project` (request value or `Settings.DEFAULT_PROJECT`); call `validate_project_name`; raise 422 on failure (FastAPI's standard pydantic-error path).
-2. Resolve `thread_id` (request value or `uuid4()`).
-3. Call `recorder.ensure_conversation_started(project=..., conversation_id=thread_id)` to get the file path.
-4. Read history: `messages, _stats = reader.read_conversation(vault_root, project, thread_id)`.
-5. `run_id = ulid.new().str`; capture `started_at = datetime.now(tz=UTC)`.
-6. `recorder.run_start(path=..., run_id=run_id, is_sidechain=False, agent_name="main", model=settings_model_string(), instructions=agent.system_prompt(), ...)` (the instructions string is whatever the Agent will pass through to its first ModelRequest; phase 1's Agent has a static instructions string).
-7. `result = await agent.run(body.message, conversation_id=thread_id, message_history=messages)`.
-8. `recorder.append_messages(..., messages=result.new_messages(), ...)`.
-9. `recorder.run_end(..., status="completed", duration_ms=(now - started_at).total_seconds() * 1000, ...)`.
-10. Return `{"output": result.output, "thread_id": thread_id}`.
+The handler validates project (raising 422 on regex failure), resolves `thread_id` (generating a fresh `uuid4()` when absent), reads history via `reader.read_conversation`, runs the agent with `conversation_id=thread_id` and `message_history=...`, and brackets the run with `recorder.run_start` / `recorder.append_messages(result.new_messages())` / `recorder.run_end(status="completed", duration_ms=...)`. Response body is `{"output": result.output, "thread_id": thread_id}`. The instructions passed to `recorder.run_start` are whatever the Agent will pass through to its first `ModelRequest` (phase 1's Agent has a static instructions string).
 
 `app.py` dependency-injects a process-singleton `TranscriptRecorder` via a new `get_recorder(settings)` factory; the test seam mirrors `get_agent` (override at `app.dependency_overrides[get_recorder]` for tests that want to count writer calls).
 
@@ -746,7 +729,6 @@ Handler flow:
 
 `tests/test_app_server_canonical_history.py`:
 - `test_chat_sync_replays_prior_messages_to_agent`: prepopulate a JSONL with two prior turns; POST a new message with the matching `thread_id`; assert (via a TestModel that captures `message_history` passed to it) that the agent received the two prior turns.
-- `test_chat_sync_ignores_client_supplied_messages`: this test does not apply to `/chat/sync` (the wire shape doesn't include `messages`); move-along.
 
 - [ ] **9.1** Write `tests/test_app_chat_sync_capture.py` and `tests/test_app_server_canonical_history.py`. _(scott)_
 - [ ] **9.2** Run the tests. Expect failures (handler doesn't yet wire the recorder). _(scott)_
@@ -777,7 +759,9 @@ Handler flow:
 
 **Branch B** applies when Task 1 confirmed no such attribute exists. The handler taps the AG-UI event stream as it iterates: accumulate `TextMessageContent` deltas into a buffer and, on `RunFinished`, synthesize one `ModelResponse` with a single `TextPart` containing the assembled text, plus one `ModelRequest` carrying a `UserPromptPart` with `run_input.messages[-1].content`. Capture is degraded (no tool calls, no thinking parts, no usage stats), acceptable for phase 1 because there are no tools and no thinking-capable model wired by default. The reference doc records this trade-off.
 
-**Cancellation contract** (both branches): if the client disconnects mid-stream, `asyncio.CancelledError` propagates through the response generator. The handler must catch at the outer level, compute `duration_ms` from the captured start time, append whatever messages the capture surface can provide (Branch A: the result's available messages, possibly partial; Branch B: a synthetic `ModelResponse` with the partial assembled text if any was streamed before the cancel), append a `run_end` event with `status: "cancelled"`, then re-raise `CancelledError`. Cancellation must preserve the user message and any pre-cancellation assistant content; the user's `ModelRequest` must therefore be appended before the `run_end`.
+**Escalate** if Task 1 finds neither branch viable (e.g., the manual flow rejects `conversation_id` / `message_history` kwargs at `run_stream`). The fallback path pre-authorized by `docs/plans/01-ag-ui-migration.md` ADR D4 is to drive `agent.iter()` manually and re-encode events via `adapter.encode_stream`; document the choice in `NOTES.md` before writing code.
+
+**Cancellation contract** (both branches): on `CancelledError`, append whatever the capture surface yields (Branch-specific), then the user's `ModelRequest` (so cancellation never loses the user turn), then a `run_end` with `status: "cancelled"` and the measured `duration_ms`, then re-raise.
 
 **Tested by:**
 
@@ -791,43 +775,22 @@ Handler flow:
 - `test_chat_ag_ui_cancellation_writes_run_end_with_status_cancelled`: drive the AG-UI request through `httpx.ASGITransport`; abort the stream mid-flight (close the response context); wait briefly; assert the JSONL has a `run_end` event with `status == "cancelled"`.
 - `test_chat_ag_ui_cancellation_preserves_user_message`: same setup; assert the `model_message` event for the user's request was written before the `run_end`.
 
-- [ ] **10.1** Re-read Task 1's `## AG-UI capture path` decision in `jsonl-transcript-format.md`. Pick Branch A or Branch B accordingly. _(scott)_
-- [ ] **10.2** Write `tests/test_app_chat_ag_ui_capture.py` and `tests/test_app_cancellation.py`. _(scott)_
-- [ ] **10.3** Run the tests. Expect failures. _(scott)_
-- [ ] **10.4** Modify `assistant/app.py` to implement the chosen branch. The existing `dispatch_request` line is replaced. The `ChatSyncRequest`-style request typing for `/chat` is not introduced (AG-UI's `RunAgentInput` is the request body); project comes from `run_input.context` per the AG-UI spec (a context object) or via the body's top-level. (Implementer: check the reference doc; if the AG-UI body lacks a clean place, fall back to a query param `?project=...` and document this in NOTES.) _(scott)_
-- [ ] **10.5** Modify `assistant/client.py`: `AssistantClient.stream_chat(message, *, thread_id: str | None = None, project: str | None = None)`. `thread_id` defaults to `str(uuid.uuid4())` (current behavior). `project`, if supplied, is sent via the body or query param matching whatever the server expects after 10.4. _(scott)_
-- [ ] **10.6** Run AG-UI capture tests. Pass. _(scott)_
-- [ ] **10.7** Run cancellation tests. Pass. (If the cancellation path is hard to trigger via httpx, the implementer may simulate by directly calling the handler's cancellation branch with a synthetic CancelledError raise; document the test approach in the docstring.) _(scott)_
-- [ ] **10.8** Run full suite. Phase-0 smoke tests (`test_smoke.py`) still pass; phase-0 client test (`test_client.py`) still passes (the `thread_id`/`project` kwargs are optional). _(scott)_
-- [ ] **10.9** Run ruff + mypy. Clean. _(scott)_
-- [ ] **10.10** Commit: `feat(app): /chat captures transcripts via manual AGUIAdapter flow with cancellation support`. _(scott)_
-
-### Task 11: Client adapter `project` and `thread_id` kwargs
-
-**Files:**
-- Modify: `assistant/client.py` (continuation of Task 10 if any)
-- Test: `tests/test_client.py` (extend, not replace)
-
-**Contract.** `AssistantClient.stream_chat` signature:
-
-```python
-async def stream_chat(
-    self, message: str, *, thread_id: str | None = None, project: str | None = None,
-) -> AsyncIterator[str]: ...
-```
-
-Backwards-compatible: existing callers passing only `message` still work; `thread_id` defaults to a fresh UUID; `project` defaults to None (server applies its default).
-
-**Tested by (additions to `tests/test_client.py`):**
+`tests/test_client.py` (extensions to the existing file):
 - `test_stream_chat_uses_supplied_thread_id`: pass a fixed `thread_id`; assert the server saw exactly that thread_id (verified by inspecting the recorded JSONL).
 - `test_stream_chat_passes_project_when_supplied`: pass `project="custom"`; the JSONL file lands under `vault/transcripts/custom/...`.
 
-- [ ] **11.1** If Task 10 already covered this, skip Task 11 entirely and note "covered by Task 10" in the commit log; otherwise: extend `assistant/client.py` and add the two tests. _(scott)_
-- [ ] **11.2** Run `uv run pytest tests/test_client.py -v`. New tests pass; existing tests still pass. _(scott)_
-- [ ] **11.3** Run full suite + ruff + mypy. Clean. _(scott)_
-- [ ] **11.4** Commit (if changes): `feat(client): accept thread_id and project kwargs`. _(scott)_
+- [ ] **10.1** Re-read Task 1's `## AG-UI capture path` decision in `jsonl-transcript-format.md`. Pick Branch A or Branch B accordingly. _(scott)_
+- [ ] **10.2** Write `tests/test_app_chat_ag_ui_capture.py` and `tests/test_app_cancellation.py`. _(scott)_
+- [ ] **10.3** Run the tests. Expect failures. _(scott)_
+- [ ] **10.4** Modify `assistant/app.py` to implement the chosen branch. The existing `dispatch_request` line is replaced. The `ChatSyncRequest`-style request typing for `/chat` is not introduced (AG-UI's `RunAgentInput` is the request body). _(scott)_
+- [ ] **10.5** Modify `assistant/client.py`: `AssistantClient.stream_chat(message, *, thread_id: str | None = None, project: str | None = None)`. `thread_id` defaults to `str(uuid.uuid4())` (current behavior). `project`, if supplied, is sent via the body or query param matching whatever the server expects after 10.4. Extend `tests/test_client.py` with `test_stream_chat_uses_supplied_thread_id` and `test_stream_chat_passes_project_when_supplied`. _(scott)_
+- [ ] **10.6** Run AG-UI capture tests. Pass. _(scott)_
+- [ ] **10.7** Run cancellation tests. Pass. (If the cancellation path is hard to trigger via httpx, the implementer may simulate by directly calling the handler's cancellation branch with a synthetic CancelledError raise; document the test approach in the docstring.) _(scott)_
+- [ ] **10.8** Run full suite. Phase-0 smoke tests (`test_smoke.py`) still pass; `test_client.py` passes with both existing and new test cases (the `thread_id`/`project` kwargs are optional). _(scott)_
+- [ ] **10.9** Run ruff + mypy. Clean. _(scott)_
+- [ ] **10.10** Commit: `feat(app): /chat captures transcripts via manual AGUIAdapter flow with cancellation support`. _(scott)_
 
-### Task 12: Documentation
+### Task 11: Documentation
 
 **Files:** `assistant/README.md`, `assistant/CHANGELOG.md`, `assistant/NOTES.md`.
 
@@ -837,12 +800,12 @@ Backwards-compatible: existing callers passing only `message` still work; `threa
 - `assistant/CHANGELOG.md`: `## [0.1.0] - <merge-date>` entry. Bullets: JSONL transcripts at `vault/transcripts/{project}/{date}/{thread8}.jsonl`; vault-write primitives (writer + manifest + lock + paths); server-canonical conversation state via `conversation_id == thread_id`; both `/chat` and `/chat/sync` capture; `Settings.DEFAULT_PROJECT`; `assistant.client.stream_chat` gains `thread_id` and `project` kwargs.
 - `assistant/NOTES.md`: new section `## Transcript persistence + vault-write primitives`. Concept: **server-canonical state.** Body: the client sends a thread_id and the latest user message; the server reads the JSONL for that thread_id and reconstructs the conversation; the client never needs to track history. Pointers to `assistant/persistence/vault/writer.py` (primitives), `assistant/persistence/transcripts/recorder.py` (orchestration), `docs/references/jsonl-transcript-format.md` (format), `docs/references/vault-write-primitives.md` (cross-phase contract). Single follow-up callout: phase 2's semantic recall walks every conversation's JSONL.
 
-- [ ] **12.1** Edit `assistant/README.md`. _(scott)_
-- [ ] **12.2** Edit `assistant/CHANGELOG.md`. _(scott)_
-- [ ] **12.3** Edit `assistant/NOTES.md`. _(scott)_
-- [ ] **12.4** Commit: `docs: README, CHANGELOG, NOTES for transcript persistence`. _(scott)_
+- [ ] **11.1** Edit `assistant/README.md`. _(scott)_
+- [ ] **11.2** Edit `assistant/CHANGELOG.md`. _(scott)_
+- [ ] **11.3** Edit `assistant/NOTES.md`. _(scott)_
+- [ ] **11.4** Commit: `docs: README, CHANGELOG, NOTES for transcript persistence`. _(scott)_
 
-### Task 13: Local CI + I5 verification + remote push + merge
+### Task 12: Local CI + I5 verification + remote push + merge
 
 **Files:** none.
 
@@ -854,31 +817,15 @@ Backwards-compatible: existing callers passing only `message` still work; `threa
 - Push `feat/transcripts`. Remote CI passes on first push. If CI fails, fix and re-push; do not merge red.
 - Squash-merge to `main` via PR.
 
-- [ ] **13.1** Run the local CI sim; all five commands exit 0. _(scott)_
-- [ ] **13.2** Walk §08 Acceptance; tick every box. _(scott)_
-- [ ] **13.3** Manual I5 probe: with `LOGFIRE_TOKEN` set, POST `/chat/sync`; confirm Agent span + at least one `vault.append` span in Logfire. _(scott)_
-- [ ] **13.4** Manifest rebuild dry-run against the dev vault. _(scott)_
-- [ ] **13.5** Push the branch: `git push -u origin feat/transcripts`. _(scott)_
-- [ ] **13.6** Wait for remote CI green. If red, fix and re-push. _(scott)_
-- [ ] **13.7** Squash-merge to `main` via PR. _(scott)_
+- [ ] **12.1** Run the local CI sim; all five commands exit 0. _(scott)_
+- [ ] **12.2** Walk §07 Acceptance; tick every box. _(scott)_
+- [ ] **12.3** Manual I5 probe: with `LOGFIRE_TOKEN` set, POST `/chat/sync`; confirm Agent span + at least one `vault.append` span in Logfire. _(scott)_
+- [ ] **12.4** Manifest rebuild dry-run against the dev vault. _(scott)_
+- [ ] **12.5** Push the branch: `git push -u origin feat/transcripts`. _(scott)_
+- [ ] **12.6** Wait for remote CI green. If red, fix and re-push. _(scott)_
+- [ ] **12.7** Squash-merge to `main` via PR. _(scott)_
 
-## 07. Risks
-
-| Risk | Severity | Likelihood | Mitigation |
-|---|---|---|---|
-| `AGUIAdapter` does not expose a result object after `run_stream` drains. Branch A from Task 10 is unbuildable. | High | Plausible | Task 1's probe decides early. Branch B (event-stream tap) is the documented fallback; it captures degraded but valid transcripts. |
-| The manual `AGUIAdapter` flow rejects `conversation_id` / `message_history` kwargs at `run_stream`. The server can't pass server-canonical history through the AG-UI path. | High | Plausible | If true, the handler bypasses `AGUIAdapter.run_stream` and drives `agent.iter()` manually, then re-encodes events to AG-UI shape via `adapter.encode_stream`. Pre-authorized by `01-ag-ui-migration.md` ADR D4. Task 10 documents the fallback path in the reference doc. |
-| Logfire's `gen_ai.*` namespace conflicts with our `vault.*` attribute names; spans get attribute-stripped or rejected. | Low | Unlikely | Task 1.6 confirms the namespacing matches `logging_setup.py`. If a conflict surfaces in Task 3, rename to `vault.<op>.bytes` etc. before the writer commit. |
-| `fsync` on every `append` is slow enough that streaming responses become visibly choppy. | Medium | Possible | The writer runs `fsync` inside `asyncio.to_thread`; the event loop is not blocked. If perception lag is reported during dev usage, profile and consider batching (per-run flush) as a phase 2 amendment, not a phase 1 rework. |
-| The asyncio.Lock module-singleton creates serialization bottleneck under concurrent requests (e.g., browser opens two tabs against the same thread). | Low | Low | Phase 1 is single-user-single-tab. The lock holds for the duration of one write (a few ms). Bench in Task 13.3 if curious; revisit at phase 6+ when tool calls multiply per-turn writes. |
-| The reader's "tolerate truncated trailing line" policy hides a real corruption bug (writer is silently truncating mid-line on every call). | Medium | Unlikely | The reader logs every tolerated condition via Logfire; Task 13.4 (rebuild dry-run) compares rebuilt-from-disk to manifest. Frequent tolerations would surface in Logfire and in the rebuild diff. |
-| `python-ulid` produces collision-prone IDs under high concurrency (extremely unlikely; ULID's 80 bits of entropy make collisions astronomical). | Low | Negligible | ULID's monotonic guarantee within a process is what we need for chronological sort. Acceptable. |
-| `Settings.DEFAULT_PROJECT` shipping in phase 1 introduces a config flag we later regret. | Low | Low | The default ("default") is safe forever; any future caller-supplied project takes precedence. No data migration would be needed even if we removed the field. |
-| The 8-char thread_id prefix in filenames collides for two same-second conversations. | Low | Very unlikely | UUIDv4 first 8 hex = 32 bits; collision probability at one new conversation per second is ~10⁻⁹. If it ever fires, the manifest's full thread_id key disambiguates; the file with the older `started_at` keeps its name and the new one increments a counter suffix (implementer adds this only if it ever fires). |
-| The implementer hits a pydantic-ai serialization edge case Task 1 didn't probe (e.g., a `BinaryContent` containing 50 MB and we inline it). | Medium | Possible | Phase 1 has no real path for users to attach 50 MB. If the implementer hits it in Task 7's round-trip suite, file a follow-up issue and skip the offending test with an `xfail` reason that points at phase 6 (tool returns) or phase 3 (large dynamic instructions) as the first real consumer. |
-| §I5 regression: vault writes happen but no Logfire span is emitted (silent observability gap). | Medium | Unlikely | Task 3 covers this with `test_append_emits_logfire_span`; Task 13.3 verifies end-to-end. |
-
-## 08. Acceptance
+## 07. Acceptance
 
 - [ ] `feat/transcripts` branched off `main`'s phase 0 final squash commit (PF4). _(scott)_
 - [ ] `pyproject.toml` has `python-ulid` in dependencies. _(scott)_
@@ -908,7 +855,7 @@ Backwards-compatible: existing callers passing only `message` still work; `threa
 - [ ] `assistant/NOTES.md` has a `## Transcript persistence + vault-write primitives` section. _(scott)_
 - [ ] Squash-merge landed on `main`; remote CI green. _(scott)_
 
-## 09. Out of scope
+## 08. Out of scope
 
 These do not have tasks in this plan and will not block acceptance:
 
@@ -920,9 +867,3 @@ These do not have tasks in this plan and will not block acceptance:
 - CLI subcommands (`assistant transcripts list/replay/export`).
 - Provenance markers.
 
-## 10. Open questions (surface, do not resolve here)
-
-These don't block phase 1 implementation; the next phase's plan revisits them.
-
-- **Markdown view of JSONL utility.** A future `assistant transcripts view <thread_id>` that renders JSONL to readable markdown. Phase 5 (eval harness) may want this; otherwise defer to whoever needs it first.
-- **Provenance markers timing.** Originally scoped for this phase but deferred to phase 3, where the memory writer becomes the first consumer. Confirm in phase 3 planning that this remains the right ordering.
