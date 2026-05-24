@@ -58,11 +58,21 @@ docs/
 
 The **spec** captures brainstorming Q&A, exploration of alternatives, and any planning-rationale flavor. It stays in `scratch/` permanently and is never copied or referenced from `assistant/`.
 
-The **plan** is written in product voice from the start: zero portfolio framing, zero "interview" or career narrative. It is the handoff artifact.
+The **plan** is written in product voice from the start: zero portfolio framing, zero "interview" or career narrative, zero `scratch/`-side breadcrumbs. It is the handoff artifact and must read as if it was authored inside `assistant/`.
 
 **Reference docs** in `docs/references/` hold cross-phase context the implementer needs that the plan body no longer carries: tech-stack rationale, project-wide conventions, patterns introduced in one phase and reused in later ones (vault-write primitives, test-seam patterns), inter-phase contracts (SSE event shape, fixture frontmatter). Each file covers one concern. References are product-voiced like plans (no portfolio framing) and authored by the planner alongside the plan. See `.claude/skills/writing-plans/SKILL.md` §Reference Docs for when to author one.
 
-At handoff time, the planning instance copies the finalized plan plus any new or amended references into `assistant/`:
+**Before running the handoff cp**, sanitize the plan and any new or amended reference docs of `scratch/`-side breadcrumbs. The cp is verbatim; whatever is in the `scratch/` copy lands in `assistant/`. The implementer instance never reads from `scratch/`, and anything that invites it to look across the boundary is a leak. Sanitize before, not after.
+
+Concretely, check:
+
+- **Frontmatter** has no `spec:` or `progression:` fields, no `(assistant/) ...` disambiguators in `references:`, no relative path that resolves only from `scratch/`. The reader has no way to follow a broken link to the right place.
+- **Body** has no `per spec §X` or `from spec §...` citations. The spec lives only in `scratch/`; decisions must be restated inline.
+- **§Changeset (or equivalent)** lists only files the implementer will actually touch. The master progression plan never appears here.
+- **Tasks** carry no `cd ../assistant && ...` wrappers, `(in scratch/)` qualifiers, or `In scratch/: ...` closeout steps. The implementer is already inside `assistant/`.
+- **§Open questions (or equivalent)** holds only product-side questions. Planner-meta concerns (filename conventions, scratch-side doc reconciliation, what to mirror across repos) belong in `scratch/`'s own dev log, not in the handoff artifact.
+
+Once sanitized, the planning instance copies the finalized plan plus any new or amended references into `assistant/`:
 
 ```
 cp docs/plans/NN-<slug>.md ../assistant/docs/plans/NN-<slug>.md
