@@ -1,0 +1,835 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Serving a pydantic-ai Agent over HTTP — patterns &amp; tradeoffs</title>
+<style>
+  :root {
+    --fg: #1a1a1a;
+    --fg-muted: #555;
+    --fg-dim: #888;
+    --bg: #fafaf7;
+    --bg-card: #ffffff;
+    --bg-code: #f3f1ec;
+    --border: #e3e0d8;
+    --accent: #b35a00;
+    --good: #2d6a3e;
+    --bad: #a8341a;
+    --note-bg: #fff6e3;
+    --note-border: #e9c26a;
+    --warn-bg: #ffeae3;
+    --warn-border: #d99581;
+    --rec-bg: #e9f3eb;
+    --rec-border: #87b893;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fg: #ebe7dd;
+      --fg-muted: #b3afa5;
+      --fg-dim: #888477;
+      --bg: #14130f;
+      --bg-card: #1c1b16;
+      --bg-code: #232118;
+      --border: #2f2c23;
+      --accent: #e09150;
+      --good: #7fbf95;
+      --bad: #e08070;
+      --note-bg: #2a2415;
+      --note-border: #66501f;
+      --warn-bg: #2c1c16;
+      --warn-border: #6e3a2a;
+      --rec-bg: #1b2a1f;
+      --rec-border: #406b4b;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: var(--sans);
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.55;
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: 240px minmax(0, 1fr);
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 32px;
+    gap: 48px;
+  }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; padding: 0 20px; gap: 16px; }
+    nav.toc { position: static !important; top: auto !important; padding-top: 24px !important; }
+  }
+  nav.toc {
+    position: sticky;
+    top: 24px;
+    align-self: start;
+    padding-top: 56px;
+    font-size: 13px;
+    line-height: 1.7;
+    max-height: calc(100vh - 24px);
+    overflow-y: auto;
+  }
+  nav.toc h2 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--fg-dim);
+    margin: 0 0 8px;
+    font-weight: 600;
+  }
+  nav.toc ol {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 24px;
+    counter-reset: toc;
+  }
+  nav.toc li {
+    counter-increment: toc;
+    padding: 2px 0;
+  }
+  nav.toc li::before {
+    content: counter(toc) ".";
+    color: var(--fg-dim);
+    display: inline-block;
+    width: 22px;
+    font-variant-numeric: tabular-nums;
+  }
+  nav.toc a {
+    color: var(--fg-muted);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+  }
+  nav.toc a:hover { color: var(--accent); border-bottom-color: var(--accent); }
+  main {
+    padding: 56px 0 96px;
+    min-width: 0;
+  }
+  header.doc {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 32px;
+    margin-bottom: 48px;
+  }
+  header.doc .kicker {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+  h1 {
+    font-size: 34px;
+    line-height: 1.15;
+    margin: 0 0 16px;
+    letter-spacing: -0.01em;
+  }
+  header.doc p.lede {
+    font-size: 18px;
+    color: var(--fg-muted);
+    max-width: 720px;
+    margin: 0;
+  }
+  section.approach {
+    padding: 32px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  section.approach:last-of-type { border-bottom: none; }
+  section.approach h2 {
+    font-size: 24px;
+    margin: 0 0 4px;
+    letter-spacing: -0.01em;
+  }
+  section.approach .number {
+    font-size: 12px;
+    color: var(--fg-dim);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  section.approach .subtitle {
+    color: var(--fg-muted);
+    margin: 0 0 24px;
+    font-size: 15px;
+  }
+  h3 {
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--fg-dim);
+    margin: 28px 0 10px;
+    font-weight: 600;
+  }
+  p { margin: 0 0 14px; }
+  p:last-child { margin-bottom: 0; }
+  ul, ol { margin: 0 0 14px; padding-left: 22px; }
+  li { margin: 4px 0; }
+  code {
+    font-family: var(--mono);
+    font-size: 0.88em;
+    background: var(--bg-code);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+  pre {
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px 18px;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.55;
+    margin: 0 0 16px;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; }
+  .callout {
+    border-left: 3px solid var(--note-border);
+    background: var(--note-bg);
+    padding: 12px 16px;
+    border-radius: 4px;
+    margin: 16px 0;
+    font-size: 14px;
+  }
+  .callout.warn { border-color: var(--warn-border); background: var(--warn-bg); }
+  .callout.rec  { border-color: var(--rec-border);  background: var(--rec-bg); }
+  .callout strong { display: block; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 6px; opacity: 0.8; }
+  .grid2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin: 8px 0 4px;
+  }
+  @media (max-width: 700px) { .grid2 { grid-template-columns: 1fr; gap: 8px; } }
+  .grid2 .col h3 { margin-top: 0; }
+  .grid2 .col ul { padding-left: 18px; }
+  .pros li::marker, .cons li::marker { font-size: 0; }
+  .pros li, .cons li { position: relative; padding-left: 20px; list-style: none; }
+  .pros li::before { content: "+"; position: absolute; left: 0; color: var(--good); font-weight: 700; }
+  .cons li::before { content: "−"; position: absolute; left: 0; color: var(--bad); font-weight: 700; }
+  table.matrix {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin: 16px 0;
+  }
+  table.matrix th, table.matrix td {
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  table.matrix th {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--fg-dim);
+    font-weight: 600;
+    background: var(--bg-card);
+  }
+  table.matrix td.app { font-weight: 600; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; vertical-align: middle; }
+  .dot.full { background: var(--good); }
+  .dot.part { background: var(--accent); }
+  .dot.none { background: var(--fg-dim); opacity: 0.4; }
+  .legend { font-size: 12px; color: var(--fg-dim); margin: -4px 0 16px; }
+  .legend .dot { margin: 0 4px 0 12px; }
+  footer.doc {
+    margin-top: 56px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    font-size: 13px;
+    color: var(--fg-dim);
+  }
+  footer.doc a { color: var(--fg-muted); }
+  .stamp {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: var(--bg-code);
+    color: var(--fg-muted);
+    margin-left: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+    vertical-align: 2px;
+  }
+  .stamp.current { background: var(--rec-bg); color: var(--good); }
+</style>
+</head>
+<body>
+<div class="layout">
+  <nav class="toc">
+    <h2>Approaches</h2>
+    <ol>
+      <li><a href="#ag-ui">AG-UI native (current)</a></li>
+      <li><a href="#non-streaming">Non-streaming JSON</a></li>
+      <li><a href="#sse-deltas">SSE deltas (launch-time)</a></li>
+      <li><a href="#sse-cumulative">SSE cumulative</a></li>
+      <li><a href="#sse-with-final">SSE deltas + final result</a></li>
+      <li><a href="#ndjson">NDJSON streaming</a></li>
+      <li><a href="#websocket">WebSocket</a></li>
+      <li><a href="#structured-stream">Streaming structured output</a></li>
+      <li><a href="#async-job">Async job + poll</a></li>
+    </ol>
+    <h2>Reference</h2>
+    <ol>
+      <li><a href="#matrix">Comparison matrix</a></li>
+      <li><a href="#final-result">The "final result" question</a></li>
+      <li><a href="#decision">Decision guide</a></li>
+    </ol>
+  </nav>
+
+  <main>
+  <header class="doc">
+    <div class="kicker">assistant / docs / references</div>
+    <h1>Serving a pydantic-ai Agent over HTTP</h1>
+    <p class="lede">
+      An <code>Agent</code> is just a function: prompt in, text (or structured object) out. Wrapping it in an HTTP endpoint sounds trivial — and the one-line version is. But there are six or seven distinct shapes that endpoint can take, and the choice you make at this layer leaks into your client code, your observability, your test seams, and how comfortable your endpoint is to retrofit later.
+    </p>
+    <p class="lede">
+      <strong>First answer first:</strong> if your framework ships a wire format (pydantic-ai ships <a href="https://docs.ag-ui.com/introduction">AG-UI</a>), use it. That's <a href="#ag-ui">approach 0</a> below — the one this repo currently runs. The remaining eight approaches are the hand-rolled options you'd be choosing <em>between</em> if the framework didn't have an opinion. Knowing them is still worthwhile: it's what makes "use the built-in" a deliberate decision instead of a default-shrug, and it's the menu you'd reach for if you ever needed to drop the adapter (custom request validation, per-request auth, a wire shape AG-UI doesn't cover).
+    </p>
+  </header>
+
+  <!-- 0: AG-UI native -->
+  <section class="approach" id="ag-ui">
+    <div class="number">Approach 00</div>
+    <h2>AG-UI native <span class="stamp current">current</span></h2>
+    <p class="subtitle">Delegate wire-format concerns to the framework. Server speaks <a href="https://docs.ag-ui.com/introduction">AG-UI</a> via <code>pydantic_ai.ui.ag_ui.AGUIAdapter</code>; a tiny Python adapter (<code>assistant.client.AssistantClient</code>) restores the one-liner UX for non-browser callers.</p>
+<pre><code>from fastapi import Depends, FastAPI, Request
+from fastapi.responses import Response
+from pydantic_ai import Agent
+from pydantic_ai.ui.ag_ui import AGUIAdapter
+
+@app.post("/chat")
+async def chat(
+    request: Request,
+    agent: Agent[None, str] = Depends(get_agent),
+) -&gt; Response:
+    return await AGUIAdapter.dispatch_request(request, agent=agent)</code></pre>
+    <h3>Wire shape</h3>
+<pre><code>HTTP/1.1 200 OK
+Content-Type: text/event-stream
+
+data: {"type":"RUN_STARTED","threadId":"...","runId":"...","timestamp":...}
+
+data: {"type":"TEXT_MESSAGE_START","messageId":"...","role":"assistant","timestamp":...}
+
+data: {"type":"TEXT_MESSAGE_CONTENT","messageId":"...","delta":"po","timestamp":...}
+
+data: {"type":"TEXT_MESSAGE_CONTENT","messageId":"...","delta":"ng","timestamp":...}
+
+data: {"type":"TEXT_MESSAGE_END","messageId":"...","timestamp":...}
+
+data: {"type":"RUN_FINISHED","threadId":"...","runId":"...","timestamp":...}</code></pre>
+    <p>The request body is a <code>RunAgentInput</code>: <code>thread_id</code>, <code>run_id</code>, <code>messages</code>, plus required-empty <code>tools</code>, <code>context</code>, and nullable <code>state</code> / <code>forwarded_props</code>. Full field list and event-type strings live in <a href="ag-ui-surface.md"><code>docs/references/ag-ui-surface.md</code></a>.</p>
+
+    <div class="grid2">
+      <div class="col"><h3>When to reach for it</h3>
+        <ul>
+          <li>Your framework ships a wire format. Using the vendored one is the right default — you stop owning SSE framing, event encoding, and the version compatibility surface.</li>
+          <li>You want a browser path (CopilotKit / AG-UI React components) and a Python path on the same endpoint without dual-endpoint plumbing.</li>
+          <li>Structured event vocabulary matters: <code>TEXT_MESSAGE_CONTENT</code> vs <code>TOOL_CALL_START</code> vs <code>STATE_SNAPSHOT</code> all flow on one stream with discriminated types.</li>
+        </ul>
+      </div>
+      <div class="col"><h3>When to avoid</h3>
+        <ul>
+          <li>You need custom request validation, per-thread quotas, or auth that must fire <em>before</em> the agent runs. <code>dispatch_request</code> is convenience-shaped; drop to the manual <code>build_run_input</code> / <code>run_stream</code> / <code>encode_stream</code> flow when you outgrow it.</li>
+          <li>Your wire is constrained to something AG-UI doesn't cover (custom binary protocol, fixed-shape JSON for a legacy consumer).</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="col"><h3 class="pros-h">Pros</h3>
+        <ul class="pros">
+          <li>Zero hand-rolled SSE framing. Wire format drift is the framework's problem.</li>
+          <li>One endpoint, many consumers (browser, Python, future TUI).</li>
+          <li>Test seam unchanged: <code>Depends(get_agent)</code> + <code>app.dependency_overrides</code> still inject TestModel-backed Agents (verified in <code>tests/test_smoke.py</code>).</li>
+          <li>Richer event vocabulary available when you need it (tools, thinking, state, reasoning — see <code>ag_ui.core.EventType</code>).</li>
+        </ul>
+      </div>
+      <div class="col"><h3 class="cons-h">Cons</h3>
+        <ul class="cons">
+          <li><code>RunAgentInput</code> is verbose to type. The <code>assistant.client.AssistantClient</code> adapter exists exactly to hide that.</li>
+          <li>Wire-format coupling to pydantic-ai's minor versions. Re-verify <a href="ag-ui-surface.md"><code>ag-ui-surface.md</code></a> at every bump.</li>
+          <li>You don't own the SSE framing. If something breaks at that layer, the failure is one library deep.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 1 -->
+  <section class="approach" id="non-streaming">
+    <div class="number">Approach 01</div>
+    <h2>Non-streaming JSON</h2>
+    <p class="subtitle">Wait for the whole response, return one JSON body.</p>
+<pre><code>@app.post("/chat")
+async def chat(req: ChatRequest, agent: Agent[None, str] = Depends(get_agent)):
+    result = await agent.run(req.message)
+    return {
+        "output": result.output,
+        "usage": result.usage().model_dump(),
+        "messages": [m.model_dump() for m in result.all_messages()],
+    }</code></pre>
+    <h3>Wire shape</h3>
+<pre><code>HTTP/1.1 200 OK
+Content-Type: application/json
+
+{"output": "pong", "usage": {...}, "messages": [...]}</code></pre>
+
+    <div class="grid2">
+      <div class="col"><h3>When to reach for it</h3>
+        <ul>
+          <li>Server-to-server APIs where the consumer parses JSON, not SSE.</li>
+          <li>Short responses (a paragraph or less) where streaming buys you nothing.</li>
+          <li>Anywhere the client is going to <em>wait for the full text anyway</em> before doing anything with it (RAG pipelines, scoring jobs, classifiers).</li>
+          <li>When you need the full <code>result</code> object — usage, messages, tool calls — and don't want to reassemble it on the client.</li>
+        </ul>
+      </div>
+      <div class="col"><h3>When to avoid</h3>
+        <ul>
+          <li>Interactive UIs. Users hate watching a spinner for 8 seconds when they could be reading the first paragraph.</li>
+          <li>Long outputs (anything &gt; ~2 seconds of generation). Proxy timeouts and perceived-latency both bite.</li>
+          <li>When you'd like the option to cancel mid-generation. Plain JSON gives the server no signal to stop the model call.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="col"><h3 class="pros-h">Pros</h3>
+        <ul class="pros">
+          <li>Simplest possible client (one <code>fetch</code>, one <code>.json()</code>).</li>
+          <li>Trivially cacheable, retryable, idempotent-with-a-key.</li>
+          <li>Full <code>result</code> available — usage, messages, structured output, tool trace.</li>
+          <li>Works through any HTTP infra; no SSE-aware proxy required.</li>
+        </ul>
+      </div>
+      <div class="col"><h3 class="cons-h">Cons</h3>
+        <ul class="cons">
+          <li>Time-to-first-byte = time-to-full-response. Bad UX for chat.</li>
+          <li>Big payloads stall behind buffer flushes at every proxy hop.</li>
+          <li>No way for the client to react to partial output (early-stop, render-as-you-go).</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 -->
+  <section class="approach" id="sse-deltas">
+    <div class="number">Approach 02</div>
+    <h2>SSE with delta tokens <span class="stamp">launch-time baseline</span></h2>
+    <p class="subtitle">Stream new text as it arrives. Each event carries only the new piece. This is what <code>/chat</code> spoke before the AG-UI migration; the commit immediately prior to the migration is tagged <code>hand-rolled-sse</code> on <code>init/scaffold</code> if you ever want to read that code as a reference.</p>
+<pre><code>@app.post("/chat")
+async def chat(req: ChatRequest, agent: Agent[None, str] = Depends(get_agent)):
+    async def stream():
+        async with agent.run_stream(req.message) as result:
+            async for delta in result.stream_text(delta=True):
+                yield f"event: token\ndata: {json.dumps({'delta': delta})}\n\n".encode()
+        yield b"event: done\ndata: done\n\n"
+    return StreamingResponse(stream(), media_type="text/event-stream")</code></pre>
+    <h3>Wire shape</h3>
+<pre><code>HTTP/1.1 200 OK
+Content-Type: text/event-stream
+
+event: token
+data: {"delta": "po"}
+
+event: token
+data: {"delta": "ng"}
+
+event: done
+data: done</code></pre>
+
+    <div class="grid2">
+      <div class="col"><h3>When to reach for it</h3>
+        <ul>
+          <li>Interactive chat UIs in a browser. <code>EventSource</code> is built-in.</li>
+          <li>You want low time-to-first-token and don't care about per-event metadata.</li>
+          <li>Your client genuinely streams to the user as deltas arrive (typing effect).</li>
+        </ul>
+      </div>
+      <div class="col"><h3>When to avoid</h3>
+        <ul>
+          <li>Non-browser clients where SSE libraries are flaky or absent (some CLI tools, mobile networking stacks).</li>
+          <li>Clients that just want the final text — they'll have to reassemble for no reason.</li>
+          <li>Behind aggressive corporate proxies that buffer responses and break the streaming illusion.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="col"><h3>Pros</h3>
+        <ul class="pros">
+          <li>Time-to-first-token is whatever the model gives you — typically &lt; 500ms.</li>
+          <li>Built-in browser support via <code>EventSource</code> (auto-reconnect, named events).</li>
+          <li>Cheap to implement and debug: <code>curl -N</code> shows it in plain text.</li>
+        </ul>
+      </div>
+      <div class="col"><h3>Cons</h3>
+        <ul class="cons">
+          <li>One-way only. To cancel, the client has to drop the connection.</li>
+          <li>The final assembled output and usage metadata are <em>discarded</em> unless you bolt them on — see <a href="#sse-with-final">approach 4</a>.</li>
+          <li><code>EventSource</code> in the browser is GET-only; POST-with-SSE needs <code>fetch</code> + a manual stream reader.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 -->
+  <section class="approach" id="sse-cumulative">
+    <div class="number">Approach 03</div>
+    <h2>SSE with cumulative text</h2>
+    <p class="subtitle">Stream the full-text-so-far on every chunk, not just the delta.</p>
+<pre><code>async def stream():
+    async with agent.run_stream(req.message) as result:
+        async for text in result.stream_text(delta=False):   # &lt;-- delta=False
+            yield f"event: text\ndata: {json.dumps({'text': text})}\n\n".encode()
+    yield b"event: done\ndata: done\n\n"</code></pre>
+
+    <p>Each <code>text</code> here is the complete response <em>so far</em>: <code>"po"</code>, then <code>"pong"</code>, then <code>"pong!"</code>. The client just renders the latest one, no concatenation needed.</p>
+
+    <div class="grid2">
+      <div class="col"><h3>When to reach for it</h3>
+        <ul>
+          <li>Rendering markdown live. Markdown parsers don't tolerate partial input mid-token (think a half-open code fence); re-parsing the cumulative text on each chunk is simpler and more robust than maintaining a stateful incremental parser.</li>
+          <li>Clients that can lose chunks (mobile networks, retries mid-stream). The last chunk you receive is always the truth.</li>
+        </ul>
+      </div>
+      <div class="col"><h3>When to avoid</h3>
+        <ul>
+          <li>Long outputs. Bandwidth grows as <strong>O(n²)</strong> — each chunk re-sends everything before it.</li>
+          <li>Clients doing a typing-effect animation. They need deltas, not snapshots.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 -->
+  <section class="approach" id="sse-with-final">
+    <div class="number">Approach 04</div>
+    <h2>SSE deltas + final result event <span class="stamp">recommended next step</span></h2>
+    <p class="subtitle">Stream tokens for UX; emit one closing event with the assembled output and metadata.</p>
+<pre><code>async def stream():
+    async with agent.run_stream(req.message) as result:
+        async for delta in result.stream_text(delta=True):
+            yield f"event: token\ndata: {json.dumps({'delta': delta})}\n\n".encode()
+        # After the loop exhausts, result still holds the full state.
+        final = {
+            "output": result.get_output(),
+            "usage": result.usage().model_dump(),
+        }
+        yield f"event: result\ndata: {json.dumps(final)}\n\n".encode()
+    yield b"event: done\ndata: done\n\n"</code></pre>
+
+    <p>Same wire as approach 2 with one extra event before <code>done</code>:</p>
+<pre><code>event: token
+data: {"delta": "po"}
+
+event: token
+data: {"delta": "ng"}
+
+event: result
+data: {"output": "pong", "usage": {"requests": 1, "request_tokens": 12, "response_tokens": 1, "total_tokens": 13}}
+
+event: done
+data: done</code></pre>
+
+    <div class="callout rec"><strong>Why this is the upgrade</strong>
+      <p>Streaming clients can ignore the <code>result</code> event and keep their delta-rendering logic. Storage / replay / observability clients can listen for <em>just</em> the <code>result</code> event and skip the deltas. You add one event, you make the endpoint useful for two consumer shapes, and you stop throwing away the metadata pydantic-ai already computed.</p>
+    </div>
+
+    <h3>Tradeoff to know about</h3>
+    <ul>
+      <li>The wire format gains a new event type. Anything (a test, a client, a contract) that asserts the <em>exact</em> stream of events needs updating.</li>
+      <li>The closing burst (<code>result</code> immediately followed by <code>done</code>) is two events the client sees back-to-back. If a client treats <code>done</code> as "now I can read the final result from local state," moving the result event before <code>done</code> just works.</li>
+    </ul>
+  </section>
+
+  <!-- 5 -->
+  <section class="approach" id="ndjson">
+    <div class="number">Approach 05</div>
+    <h2>NDJSON over chunked encoding</h2>
+    <p class="subtitle">One JSON object per line. Like SSE, but cheaper to parse and friendlier to non-browser clients.</p>
+<pre><code>async def stream():
+    async with agent.run_stream(req.message) as result:
+        async for delta in result.stream_text(delta=True):
+            yield (json.dumps({"type": "token", "delta": delta}) + "\n").encode()
+        yield (json.dumps({"type": "result", "output": result.get_output()}) + "\n").encode()
+return StreamingResponse(stream(), media_type="application/x-ndjson")</code></pre>
+    <h3>Wire shape</h3>
+<pre><code>HTTP/1.1 200 OK
+Content-Type: application/x-ndjson
+Transfer-Encoding: chunked
+
+{"type": "token", "delta": "po"}
+{"type": "token", "delta": "ng"}
+{"type": "result", "output": "pong"}</code></pre>
+
+    <div class="grid2">
+      <div class="col"><h3>When to reach for it</h3>
+        <ul>
+          <li>CLI clients, scripts, and any consumer that already does line-buffered IO. <code>curl ... | jq -c</code> works out of the box.</li>
+          <li>Backends consuming the stream where the SSE protocol is overkill (you don't need event names, just typed payloads).</li>
+          <li>Apple platforms, where <code>EventSource</code> support has historically been spotty and JSON-lines is universal.</li>
+        </ul>
+      </div>
+      <div class="col"><h3>When to avoid</h3>
+        <ul>
+          <li>Browser clients. There's no native NDJSON reader; you'd write the same fetch-and-parse loop you'd write for SSE anyway, but without the named-event ergonomics.</li>
+          <li>Anywhere you want client-side automatic reconnect — that's an SSE feature, not an NDJSON one.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6 -->
+  <section class="approach" id="websocket">
+    <div class="number">Approach 06</div>
+    <h2>WebSocket</h2>
+    <p class="subtitle">A bidirectional, long-lived connection. The client can send more messages or cancel mid-generation.</p>
+<pre><code>@app.websocket("/chat")
+async def chat_ws(ws: WebSocket, agent: Agent[None, str] = Depends(get_agent)):
+    await ws.accept()
+    try:
+        while True:
+            data = await ws.receive_json()    # {"type": "user", "message": "..."}
+            if data["type"] == "cancel":
+                continue                       # handled by the outer loop wiring
+            async with agent.run_stream(data["message"]) as result:
+                async for delta in result.stream_text(delta=True):
+                    await ws.send_json({"type": "token", "delta": delta})
+                await ws.send_json({"type": "result", "output": result.get_output()})
+    except WebSocketDisconnect:
+        return</code></pre>
+
+    <div class="grid2">
+      <div class="col"><h3>When to reach for it</h3>
+        <ul>
+          <li>Multi-turn chat where the connection persists across turns (avoiding TCP/TLS handshakes per message).</li>
+          <li>You need genuine bidirectionality: cancel buttons, mid-stream user interjections, server-pushed events between user turns.</li>
+          <li>Server-pushed background events: tool-call traces, "agent is thinking" indicators, partial structured-output validations.</li>
+        </ul>
+      </div>
+      <div class="col"><h3>When to avoid</h3>
+        <ul>
+          <li>The endpoint is genuinely one-shot. WebSocket adds a handshake, a framing layer, and a state machine for no benefit.</li>
+          <li>You want HTTP-shaped observability (status codes, response times per request). WS connections don't slot into standard request-metric dashboards.</li>
+          <li>Your infrastructure doesn't love long-lived connections — serverless platforms, CDN proxies, browser tabs that go to background.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="callout warn"><strong>Watch out</strong>
+      <p>WS dependency injection in FastAPI works but is more limited than HTTP routes — <code>app.dependency_overrides</code> still works for the test seam, but middleware, auth helpers, and rate-limiters often need WS-specific equivalents.</p>
+    </div>
+  </section>
+
+  <!-- 7 -->
+  <section class="approach" id="structured-stream">
+    <div class="number">Approach 07</div>
+    <h2>Streaming structured output</h2>
+    <p class="subtitle">When <code>output_type</code> is a pydantic model, stream partial validations as fields fill in.</p>
+<pre><code>class TicketDraft(BaseModel):
+    title: str
+    severity: Literal["low", "med", "high"]
+    body: str
+
+agent = Agent(model=..., output_type=TicketDraft)
+
+async def stream():
+    async with agent.run_stream(req.message) as result:
+        async for partial in result.stream():       # yields partial TicketDraft objects
+            yield f"event: partial\ndata: {partial.model_dump_json()}\n\n".encode()
+        final = result.get_output()
+        yield f"event: result\ndata: {final.model_dump_json()}\n\n".encode()
+    yield b"event: done\ndata: done\n\n"</code></pre>
+
+    <p>The client sees a sequence of progressively-more-complete <code>TicketDraft</code> objects: first just a title, then title + severity, then all three fields. UIs that render structured forms can light up each field as it lands.</p>
+
+    <div class="grid2">
+      <div class="col"><h3>When to reach for it</h3>
+        <ul>
+          <li>Structured output (a pydantic model with multiple fields).</li>
+          <li>UIs that show a live-updating form, table row, or card.</li>
+          <li>Pipelines that can act on partial-but-valid data (e.g., start a database lookup as soon as the <code>id</code> field arrives).</li>
+        </ul>
+      </div>
+      <div class="col"><h3>When to avoid</h3>
+        <ul>
+          <li>Plain text output. There's nothing structured to stream.</li>
+          <li>Strict consumers that can't tolerate intermediate states. pydantic's partial validation is permissive (missing required fields, narrow types as the parse progresses); your consumer code has to be too.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8 -->
+  <section class="approach" id="async-job">
+    <div class="number">Approach 08</div>
+    <h2>Async job + poll</h2>
+    <p class="subtitle">POST creates a job and returns immediately. The client polls (or subscribes) for completion.</p>
+<pre><code>@app.post("/chat")
+async def chat(req: ChatRequest, bg: BackgroundTasks) -> dict:
+    run_id = uuid4().hex
+    bg.add_task(run_agent_and_persist, run_id, req.message)
+    return {"run_id": run_id, "status_url": f"/chat/{run_id}"}
+
+@app.get("/chat/{run_id}")
+async def chat_status(run_id: str) -> dict:
+    return read_run(run_id)   # {"status": "pending"|"done", "output": ...}</code></pre>
+
+    <div class="grid2">
+      <div class="col"><h3>When to reach for it</h3>
+        <ul>
+          <li>Runs that may take more than a few seconds and clients that can poll comfortably (cron jobs, background workers).</li>
+          <li>You want the result to survive the client disconnecting (close a laptop, kick off agent, come back tomorrow).</li>
+          <li>You're building agent runs that branch into tools, sub-agents, or sleeps; you want the run as a first-class entity with its own lifecycle.</li>
+        </ul>
+      </div>
+      <div class="col"><h3>When to avoid</h3>
+        <ul>
+          <li>Interactive chat. Polling is a terrible UX.</li>
+          <li>You don't have a persistence layer yet. Async jobs require storage; without it the "job" lives in process memory and dies with the worker.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="callout"><strong>Bridges</strong>
+      <p>This pattern composes nicely with the others: the GET endpoint can return JSON (approach 1), or hand back an SSE stream (approach 2) that replays the deltas captured to storage. The job model decouples "when the work happens" from "how the client consumes it."</p>
+    </div>
+  </section>
+
+  <!-- Matrix -->
+  <section class="approach" id="matrix">
+    <h2>Comparison matrix</h2>
+    <p class="subtitle">A quick visual; consult the per-approach sections for nuance.</p>
+    <table class="matrix">
+      <thead>
+        <tr>
+          <th>Approach</th>
+          <th>Low TTFT</th>
+          <th>Final result available</th>
+          <th>Browser-native</th>
+          <th>Bidirectional</th>
+          <th>Survives client drop</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td class="app">0. AG-UI native (current)</td>
+            <td><span class="dot full"></span></td>
+            <td><span class="dot part"></span></td>
+            <td><span class="dot part"></span></td>
+            <td><span class="dot none"></span></td>
+            <td><span class="dot none"></span></td></tr>
+        <tr><td class="app">1. Non-streaming JSON</td>
+            <td><span class="dot none"></span></td>
+            <td><span class="dot full"></span></td>
+            <td><span class="dot full"></span></td>
+            <td><span class="dot none"></span></td>
+            <td><span class="dot none"></span></td></tr>
+        <tr><td class="app">2. SSE deltas (launch-time)</td>
+            <td><span class="dot full"></span></td>
+            <td><span class="dot none"></span></td>
+            <td><span class="dot part"></span></td>
+            <td><span class="dot none"></span></td>
+            <td><span class="dot none"></span></td></tr>
+        <tr><td class="app">3. SSE cumulative</td>
+            <td><span class="dot full"></span></td>
+            <td><span class="dot part"></span></td>
+            <td><span class="dot part"></span></td>
+            <td><span class="dot none"></span></td>
+            <td><span class="dot none"></span></td></tr>
+        <tr><td class="app">4. SSE deltas + final</td>
+            <td><span class="dot full"></span></td>
+            <td><span class="dot full"></span></td>
+            <td><span class="dot part"></span></td>
+            <td><span class="dot none"></span></td>
+            <td><span class="dot none"></span></td></tr>
+        <tr><td class="app">5. NDJSON</td>
+            <td><span class="dot full"></span></td>
+            <td><span class="dot full"></span></td>
+            <td><span class="dot none"></span></td>
+            <td><span class="dot none"></span></td>
+            <td><span class="dot none"></span></td></tr>
+        <tr><td class="app">6. WebSocket</td>
+            <td><span class="dot full"></span></td>
+            <td><span class="dot full"></span></td>
+            <td><span class="dot full"></span></td>
+            <td><span class="dot full"></span></td>
+            <td><span class="dot none"></span></td></tr>
+        <tr><td class="app">7. Streaming structured</td>
+            <td><span class="dot full"></span></td>
+            <td><span class="dot full"></span></td>
+            <td><span class="dot part"></span></td>
+            <td><span class="dot none"></span></td>
+            <td><span class="dot none"></span></td></tr>
+        <tr><td class="app">8. Async job + poll</td>
+            <td><span class="dot none"></span></td>
+            <td><span class="dot full"></span></td>
+            <td><span class="dot full"></span></td>
+            <td><span class="dot none"></span></td>
+            <td><span class="dot full"></span></td></tr>
+      </tbody>
+    </table>
+    <p class="legend">
+      <span class="dot full"></span> yes
+      <span class="dot part"></span> partial / with caveats
+      <span class="dot none"></span> no
+    </p>
+    <p><strong>"Browser-native"</strong> means the browser exposes a built-in API for the protocol (<code>fetch</code> for JSON, <code>EventSource</code> for SSE, <code>WebSocket</code> for WS). "Partial" SSE rows reflect that <code>EventSource</code> is GET-only — POST-with-SSE requires a manual <code>fetch</code>-and-parse loop.</p>
+  </section>
+
+  <!-- Final result discussion -->
+  <section class="approach" id="final-result">
+    <h2>The "final result" question</h2>
+    <p>The current <code>/chat</code> implementation streams text deltas and then closes with <code>event: done</code>. After the <code>async for</code> exhausts, pydantic-ai's <code>result</code> object still holds everything the model returned:</p>
+    <ul>
+      <li><code>result.get_output()</code> — the full assembled output (or the validated structured object, if <code>output_type</code> is a pydantic model)</li>
+      <li><code>result.usage()</code> — token counts, request counts, cost-relevant metadata</li>
+      <li><code>result.all_messages()</code> — the full conversation including system/user/assistant turns and any tool calls</li>
+      <li><code>result.new_messages()</code> — just the assistant turn produced by this run (handy for appending to a stored transcript)</li>
+    </ul>
+    <p>We throw all of that away. For a phase-0 endpoint with no persistence, that's defensible — but as soon as we want to log a run for evals, replay a transcript, or show the user a "this answer cost N tokens" indicator, the metadata becomes load-bearing.</p>
+
+    <div class="callout rec"><strong>Recommendation</strong>
+      <p>Adopt <a href="#sse-with-final">approach 4</a> (SSE deltas + final <code>event: result</code>) when persistence or observability lands. It's a one-event addition to the wire, doesn't break existing delta consumers, and lets a future logging or eval pipeline subscribe to <em>just</em> the result event. Combined with the planned vault transcript storage, this is the cleanest seam to "every run is observable" without paying for it in phase 0.</p>
+    </div>
+
+    <p>The alternative — keeping deltas-only on <code>/chat</code> and exposing the final result via a separate <code>GET /runs/{run_id}</code> — is the right shape if and only if you're <em>already</em> on <a href="#async-job">approach 8</a>. For a synchronous streaming endpoint, splitting it across two HTTP requests is more moving parts than it's worth.</p>
+  </section>
+
+  <!-- Decision -->
+  <section class="approach" id="decision">
+    <h2>Decision guide</h2>
+    <p>If you're picking once and moving on:</p>
+    <ul>
+      <li><strong>Browser chat UI?</strong> Approach 2 today, approach 4 the moment you want usage/metadata.</li>
+      <li><strong>Server-to-server, short responses?</strong> Approach 1. Don't pay streaming complexity for nothing.</li>
+      <li><strong>CLI client?</strong> Approach 5 (NDJSON). One <code>while read line</code> away from working.</li>
+      <li><strong>Multi-turn, with cancel?</strong> Approach 6 (WebSocket).</li>
+      <li><strong>Long-running, retryable, survives client drop?</strong> Approach 8, with one of the others bolted on for the GET side.</li>
+      <li><strong>Structured output that fills in over time?</strong> Approach 7.</li>
+    </ul>
+    <p>The honest truth: most teams default to approach 2 because every chat-UI tutorial uses it, hit metadata pain at month three, then either bolt on approach 4 (small win, no breaking change) or split into approach 8 + a polling client (bigger refactor, but unlocks persistence and replay). Skipping the "discover the metadata problem the hard way" step is the main thing this document is for.</p>
+  </section>
+
+  <footer class="doc">
+    <p>
+      Part of <a href="../../README.md">assistant</a> · phase 0 reference doc · pydantic-ai 1.102+ · FastAPI 0.115+ · AG-UI (current; see <a href="ag-ui-surface.md"><code>ag-ui-surface.md</code></a>)
+    </p>
+  </footer>
+  </main>
+</div>
+</body>
+</html>

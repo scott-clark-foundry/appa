@@ -4,7 +4,7 @@ status: draft
 introduced: phase 1
 pydantic-ai-pin: ">=1.102,<2"  # matches assistant/docs/references/ag-ui-surface.md
 consumers: phase 1 (write+read), phase 2 (read for indexing), phase 3 (subscribe via bus), phase 5 (replay), phase 8 (read for pattern mining), phase 10 (read)
-last-verified: null
+last-verified: 2026-05-24
 ---
 
 # JSONL transcript format
@@ -112,7 +112,7 @@ One per `ModelRequest | ModelResponse` from `result.all_messages()` / `result.ne
   "payload": {
     "kind": "request",
     "parts": [
-      {"part_kind": "user_prompt", "content": "What's on my calendar tomorrow?", "timestamp": "2026-05-23T14:30:13.001Z"}
+      {"part_kind": "user-prompt", "content": "What's on my calendar tomorrow?", "timestamp": "2026-05-23T14:30:13.001Z"}
     ],
     "instructions": "You are a helpful assistant. Today is 2026-05-23."
   }
@@ -184,7 +184,7 @@ Written when `Agent.run()` returns (clean) or raises `asyncio.CancelledError` (m
 
 ## Payload schema (kind = `model_message`)
 
-Serialized `ModelRequest` or `ModelResponse` from pydantic-ai. Use `pydantic_ai.messages.ModelMessage` (the union) for parsing: `ModelMessagesTypeAdapter.validate_python(payload)` if pydantic-ai exposes it, otherwise direct `ModelRequest.model_validate` / `ModelResponse.model_validate` discriminated on `payload["kind"]`.
+Serialized `ModelRequest` or `ModelResponse` from pydantic-ai. Use `pydantic_ai.messages.ModelMessagesTypeAdapter` (verified present at 1.102.0); `validate_python` / `validate_json` round-trip the list form. Single-message decoding can fall back to `ModelRequest.model_validate` / `ModelResponse.model_validate` discriminated on `payload["kind"]` (`"request"` | `"response"`).
 
 ### Common fields
 
@@ -197,25 +197,30 @@ Serialized `ModelRequest` or `ModelResponse` from pydantic-ai. Use `pydantic_ai.
 
 ### Response-only fields
 
-- `usage`: `{input_tokens, output_tokens, total_tokens, ...}` (pydantic-ai `RequestUsage`).
+- `usage`: pydantic-ai `RequestUsage` (a dataclass, not a pydantic model). Verified fields: `input_tokens`, `output_tokens`, `cache_write_tokens`, `cache_read_tokens`, `input_audio_tokens`, `output_audio_tokens`, `cache_audio_read_tokens`, `details`. `total_tokens` is a computed property (not serialized as a field). The serialized JSON shape carries all eight named fields with integer defaults of `0` and `details: {}`.
 - `model_name`: str.
+- `provider_name`: str (provider identifier; e.g. `"openai"`, `"test"`).
 - `finish_reason`: str (when present).
 
 ## Part taxonomy
 
-Mirrors pydantic-ai's discriminated `Part` union. Plan Task 1 confirms exact `part_kind` discriminator values.
+Mirrors pydantic-ai's discriminated `Part` union. Discriminator string values verified against `dataclasses.fields(cls)` defaults at pydantic-ai 1.102.0 (2026-05-24).
 
-| `part_kind` | Where it appears | Content |
-|---|---|---|
-| `user_prompt` | Request | `content: str | list[str | BinaryContent | ImageUrl | DocumentUrl | AudioUrl | binary_ref]`. Multimodal lives here. |
-| `system_prompt` | Request | `content: str`. Legacy; modern path uses `instructions` on the request. Kept because providers still emit it. |
-| `tool_return` | Request | `tool_name`, `content`, `tool_call_id`, `timestamp`. Tool result handed back to the model. |
-| `retry_prompt` | Request | `content`, `tool_name`, `tool_call_id`, `timestamp`. Fired when a tool raised `ModelRetry`. |
-| `builtin_tool_return` | Request | Provider-side tool return (e.g., OpenAI `file_search`). |
-| `text` | Response | `content: str`. Assistant text. |
-| `tool_call` | Response | `tool_name`, `args`, `tool_call_id`. Assistant requesting a tool. |
-| `thinking` | Response | `content: str`. OpenAI Responses API reasoning content. |
-| `builtin_tool_call` | Response | Provider-side tool call (e.g., Anthropic `web_search`). |
+**All `part_kind` values are kebab-case** (not snake_case). The wire format of the AG-UI response events is the same convention (`TEXT_MESSAGE_CONTENT` payloads use kebab discriminators inside `parts`).
+
+| `part_kind` | Where it appears | Class | Content |
+|---|---|---|---|
+| `user-prompt` | Request | `UserPromptPart` | `content: str | list[str | BinaryContent | ImageUrl | DocumentUrl | AudioUrl | binary_ref]`. Multimodal lives here. |
+| `system-prompt` | Request | `SystemPromptPart` | `content: str`. Legacy; modern path uses `instructions` on the request. Kept because providers still emit it. |
+| `tool-return` | Request | `ToolReturnPart` | `tool_name`, `content`, `tool_call_id`, `timestamp`. Tool result handed back to the model. |
+| `retry-prompt` | Request | `RetryPromptPart` | `content`, `tool_name`, `tool_call_id`, `timestamp`. Fired when a tool raised `ModelRetry`. |
+| `builtin-tool-return` | Request | `NativeToolReturnPart` (aka `BuiltinToolReturnPart`, deprecated alias) | Provider-side tool return (e.g., OpenAI `file_search`). |
+| `text` | Response | `TextPart` | `content: str`. Assistant text. |
+| `tool-call` | Response | `ToolCallPart` | `tool_name`, `args`, `tool_call_id`. Assistant requesting a tool. |
+| `thinking` | Response | `ThinkingPart` | `content: str`. OpenAI Responses API reasoning content. |
+| `builtin-tool-call` | Response | `NativeToolCallPart` (aka `BuiltinToolCallPart`, deprecated alias) | Provider-side tool call (e.g., Anthropic `web_search`). |
+
+Additional part classes discovered in pydantic-ai 1.102.0 (`FilePart` → `file`, `InstructionPart` → `instruction`, `CompactionPart` → `compaction`, search-variant `ToolSearchCallPart` / `ToolSearchReturnPart` reuse the `tool-call` / `tool-return` discriminators). The reader treats any unrecognised `part_kind` per `§Reader policy` (logged as `unknown_part`, dropped, message survives).
 
 `UserPromptPart.content` is the entry point for multimodal: a list mixing `str`, `BinaryContent(data, media_type)`, `ImageUrl(url)`, `DocumentUrl(url)`, `AudioUrl(url)`. Phase 1 stores them as pydantic-ai's serialized form. When content is large (binary or above threshold), phase 1's encoder defers to `binary_ref` — see `§Reference shapes`.
 
@@ -264,6 +269,36 @@ A reader **does** raise on:
 - File-level read errors (permission, missing).
 - Manifest-claimed file that doesn't exist on disk — caller can trigger `rebuild_from_vault`.
 
+## AG-UI capture path
+
+**Chosen path: Branch A via `on_complete` callback on `AGUIAdapter.run_stream(...)`.** Verified 2026-05-24 against pydantic-ai 1.102.0.
+
+The `AGUIAdapter` instance does *not* expose the run's assistant messages as a post-stream attribute. `adapter.messages` is the input history reconstructed from `run_input.messages` and is not updated by `run_stream()`. However, `run_stream()` accepts an `on_complete` kwarg whose type alias `pydantic_ai.ui.OnCompleteFunc` is:
+
+```python
+Callable[[AgentRunResult[Any]], None]
+  | Callable[[AgentRunResult[Any]], Awaitable[None]]
+  | Callable[[AgentRunResult[Any]], AsyncIterator[EventT]]
+```
+
+The callback receives an `AgentRunResult` after the agent run completes (before the encoded stream finishes draining to the client). From the result we get:
+
+- `result.all_messages()` — the full conversation list (`list[ModelMessage]`) including the user request reconstructed from `run_input` and the assistant `ModelResponse` with `usage`, `model_name`, `provider_name`, timestamps, and `run_id` / `conversation_id` all populated.
+- `result.new_messages()` — just the messages added by this run (the recorder uses this so the JSONL never double-records prior history).
+- `result.output`, `result.usage`, `result.run_id`, `result.conversation_id`, `result.metadata`, `result.timestamp`.
+
+The recorder's `append_messages(messages=result.new_messages(), ...)` is the single call that captures everything pydantic-ai knows about the run — usage stats, tool calls, thinking parts, multimodal content — without degradation.
+
+**Rejected path: Branch B (tap encoded SSE).** The encoded events from `encode_stream(...)` are AG-UI text deltas + lifecycle events. Reassembling a `ModelResponse` from them would lose usage, tool-call structure, thinking parts, and provider metadata. Branch A via `on_complete` is fully intact, so Branch B is unnecessary.
+
+**Cancellation note.** `on_complete` only fires on clean completion. The `/chat` handler wraps the drain in a `try/finally`; on `asyncio.CancelledError` the finally branch appends any partial state that landed (Branch-A-style intact capture is unavailable here — the run didn't complete), the user's `ModelRequest` (so the user turn is preserved), and a `run_end` with `status: "cancelled"`. Phase 1's cancellation path therefore *does* synthesize a degraded `ModelResponse` from whatever the AGUIAdapter accumulated; the next plan that gets called on this surface should re-verify whether pydantic-ai has added a clean hook for the cancelled path.
+
+## Server-canonical history (how it's threaded)
+
+`AGUIAdapter.run_stream(...)` accepts both `conversation_id: str | None` and `message_history: Sequence[ModelMessage] | None` as kwargs (verified 2026-05-24). The handler reads JSONL via `reader.read_conversation(...)`, passes the reconstructed list as `message_history=...`, and passes the thread_id as `conversation_id=...`. Per pydantic-ai's `message_history` contract (see Input and History reference in the building-pydantic-ai-agents skill): when `message_history` is non-empty, pydantic-ai assumes it already carries the system prompt, so the recorder never has to re-emit instructions in subsequent turns of the same conversation.
+
+The `/chat/sync` handler uses the same kwargs on `Agent.run(...)` directly. Both wires use the identical recorder API; only the capture hook differs.
+
 ## Encode / decode round-trip
 
 The integrity guarantee phase 1 commits to: for any `messages = result.all_messages()` from a run, `decode(encode(messages)) == messages` (pydantic-equality, ignoring envelope fields). Tested against every `part_kind` and against multimodal content. The implementer adds tests for any part kind not in the original test set.
@@ -271,8 +306,125 @@ The integrity guarantee phase 1 commits to: for any `messages = result.all_messa
 ## Consumer notes
 
 - **Phase 1 (write + read).** Recorder appends; chat handler reads to seed `message_history`. Both use the writer / reader primitives.
-- **Phase 2 (read).** Chunker walks each conversation's JSONL; emits one chunk per `(run_id, role)` for embedding. `text` parts from responses + `user_prompt` parts from requests are the searchable content.
+- **Phase 2 (read).** Chunker walks each conversation's JSONL; emits one chunk per `(run_id, role)` for embedding. `text` parts from responses + `user-prompt` parts from requests are the searchable content.
 - **Phase 3 (subscribe via bus).** Memory extraction subscribes to `TurnComplete` events on the in-process bus (the bus is fed by the same recorder that writes the JSONL). The JSONL is the canonical record; the bus is the live notification path.
 - **Phase 5 (replay).** Eval harness reads a conversation's JSONL, optionally trims to a prefix, and replays via `Agent.run(message_history=...)`. The encode/decode round-trip lock-in is exactly what makes this safe.
 - **Phase 8 (read for pattern mining).** Skill drafter walks JSONL across conversations, extracts tool-call patterns, drafts skills.
 - **Phase 10 (read).** Self-improvement loop reads JSONL for self-analysis.
+
+## Sample lines
+
+Captured 2026-05-24 against pydantic-ai 1.102.0 via the Task 1 probe script. Each sample is the JSON-serialized `payload` field (the `model_message` envelope wraps it). `timestamp` and `run_id` values are redacted as `<ts>` / `<run-id>` for readability; the live wire carries ISO-8601 UTC microsecond strings and ULID-shaped uuids in the envelope.
+
+**Request: `user-prompt`** (round-tripped via `ModelMessagesTypeAdapter`):
+
+```json
+{
+  "kind": "request",
+  "parts": [
+    {"part_kind": "user-prompt", "content": "hello", "timestamp": "<ts>"}
+  ],
+  "instructions": null,
+  "timestamp": null,
+  "run_id": null,
+  "conversation_id": null,
+  "metadata": null
+}
+```
+
+**Response: `text`** (round-tripped):
+
+```json
+{
+  "kind": "response",
+  "parts": [
+    {"part_kind": "text", "content": "world", "id": null, "provider_name": null, "provider_details": null}
+  ],
+  "usage": {
+    "input_tokens": 0, "output_tokens": 0, "cache_write_tokens": 0, "cache_read_tokens": 0,
+    "input_audio_tokens": 0, "output_audio_tokens": 0, "cache_audio_read_tokens": 0,
+    "details": {}
+  },
+  "model_name": null,
+  "provider_name": null,
+  "provider_url": null,
+  "provider_details": null,
+  "provider_response_id": null,
+  "finish_reason": null,
+  "timestamp": "<ts>",
+  "run_id": null,
+  "conversation_id": null,
+  "metadata": null,
+  "state": "complete"
+}
+```
+
+**Request: `system-prompt`** (shape — not exercised live by probe; based on `SystemPromptPart` dataclass):
+
+```json
+{
+  "kind": "request",
+  "parts": [
+    {"part_kind": "system-prompt", "content": "You are a helpful assistant.", "dynamic_ref": null, "timestamp": "<ts>"}
+  ]
+}
+```
+
+**Request: `tool-return`** (shape — not exercised live; from `ToolReturnPart`):
+
+```json
+{
+  "kind": "request",
+  "parts": [
+    {"part_kind": "tool-return", "tool_name": "get_weather", "content": "sunny", "tool_call_id": "call_123", "timestamp": "<ts>"}
+  ]
+}
+```
+
+**Request: `retry-prompt`** (shape — not exercised live; from `RetryPromptPart`):
+
+```json
+{
+  "kind": "request",
+  "parts": [
+    {"part_kind": "retry-prompt", "content": "Tool 'x' raised ModelRetry", "tool_name": "x", "tool_call_id": "call_456", "timestamp": "<ts>"}
+  ]
+}
+```
+
+**Response: `tool-call`** (shape — not exercised live; from `ToolCallPart`):
+
+```json
+{
+  "kind": "response",
+  "parts": [
+    {"part_kind": "tool-call", "tool_name": "get_weather", "args": {"city": "SF"}, "tool_call_id": "call_789"}
+  ],
+  "usage": {"input_tokens": 0, "output_tokens": 0, "...": "..."},
+  "model_name": "gpt-5-nano"
+}
+```
+
+**Response: `thinking`** (shape — not exercised live; from `ThinkingPart`):
+
+```json
+{
+  "kind": "response",
+  "parts": [
+    {"part_kind": "thinking", "content": "Let me work through this..."}
+  ]
+}
+```
+
+**Request: `builtin-tool-return` / Response: `builtin-tool-call`** (shape — not exercised live; from `NativeToolReturnPart` / `NativeToolCallPart`, formerly `BuiltinToolReturnPart` / `BuiltinToolCallPart` which are now deprecated aliases at 1.102.0):
+
+```json
+{
+  "kind": "response",
+  "parts": [
+    {"part_kind": "builtin-tool-call", "tool_name": "web_search", "args": {"query": "..."}, "tool_call_id": "btu_001"}
+  ]
+}
+```
+
+The encoder produces these shapes via `event.model_dump_json(exclude_none=True)`; sidechain-only envelope fields and explicit-null payload fields drop out. The round-trip tests (Task 7) walk each `part_kind` and prove pydantic-equality post-decode.

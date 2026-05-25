@@ -122,7 +122,7 @@ One repo (`assistant/`), one main branch, one persistent product. The portfolio 
 
 **DOD.** Provider abstraction enforced (`§I9`), traces logging (`§I5`), eval fixture loadable, smoke test green.
 
-**Artifacts.** [Spec](../specs/00-init-scaffold.md) · [Plan](00-init-scaffold.md)
+**Artifacts.** [Spec](../specs/00-init-scaffold.md) · [Plan](00-init-scaffold.md) · [AG-UI migration plan](01-ag-ui-migration.md) · [Post-scaffold retro](02-post-scaffold-iteration.md) · References: [AG-UI surface](../references/ag-ui-surface.md), [agent HTTP patterns](../references/agent-http-patterns.html) · Merged: 2026-05-23 (PR #1 AG-UI, PR #2 config DI, PR #3 /chat/sync)
 
 <a id="l1"></a>
 ### Phase 1 · `feat/transcripts`
@@ -135,7 +135,7 @@ One repo (`assistant/`), one main branch, one persistent product. The portfolio 
 
 **Merge.** Main has browsable transcripts.
 
-**Artifacts.** [Spec](../specs/03-transcripts.md) · References: [vault-write primitives](../references/vault-write-primitives.md), [JSONL transcript format](../references/jsonl-transcript-format.md)
+**Artifacts.** [Spec](../specs/03-transcripts.md) · [Plan](03-transcripts.md) · [Tuning DOE retro](04-tuning-doe-2026-05.md) · References: [vault-write primitives](../references/vault-write-primitives.md), [JSONL transcript format](../references/jsonl-transcript-format.md), [provider-tuning DOE](../references/provider-tuning-doe-2026-05.md), [pydantic-ai provider quirks](../references/pydantic-ai-provider-quirks.md) · Merged: 2026-05-24 (PR #4 transcripts, PR #5 tuning)
 
 <a id="l2"></a>
 ### Phase 2 · `feat/semantic-recall`

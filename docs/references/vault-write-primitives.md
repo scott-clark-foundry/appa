@@ -3,7 +3,7 @@ title: "Vault-write primitives"
 status: draft
 introduced: phase 1
 consumers: phase 1 (transcripts), phase 3 (memory), phase 4 (SKILL.md), phase 8 (skill drafts), phase 10 (self-improvement)
-last-verified: null
+last-verified: 2026-05-24
 ---
 
 # Vault-write primitives
@@ -110,6 +110,8 @@ def aux_path(sha256: str) -> Path:
 
 Single module-level `asyncio.Lock` in the writer module. Both `append` and `write_replace` acquire it. No public API beyond the writer functions — the lock is an implementation detail of "all vault writes serialize."
 
+**Why `asyncio.Lock` (not `anyio.Lock`)** — verified 2026-05-24: FastAPI/uvicorn is asyncio-native (the writer is called from `async def` handlers running on the asyncio event loop). pydantic-ai uses `anyio` internally for its own primitives, but the boundary it exposes to callers is plain `async def`, which composes cleanly with `asyncio.Lock` on either backend. `anyio.Lock` would add a dependency the writer doesn't need, and `anyio.Lock` running under asyncio's loop just delegates to `asyncio.Lock` anyway. Revisit if a phase introduces trio compatibility or directly schedules the writer onto a non-asyncio anyio backend.
+
 ## Invariants
 
 These hold across every consumer phase. Violating any of them is a phase-level regression.
@@ -119,7 +121,7 @@ These hold across every consumer phase. Violating any of them is a phase-level r
 - **`write_replace` is atomic.** When `write_replace` returns successfully, either the new content is fully visible at `path` or `path` is unchanged. No intermediate state.
 - **Manifest is a cache, not a source of truth.** If the manifest disagrees with the filesystem, `rebuild_from_vault` resolves to the filesystem.
 - **VAULT_PATH validation is startup-only.** The app refuses to start if the vault root is missing or unwritable. Runtime writes assume the root is good; transient failures during writes (disk full, permission flip) are logged and re-raised.
-- **One Logfire span per writer op.** Span attributes: `vault.path` (vault-relative), `vault.bytes_written`, `vault.latency_ms`, `vault.op_kind` (`append` or `write_replace`). Satisfies §I5 for the persistence layer.
+- **One Logfire span per writer op.** Span attributes: `vault.path` (vault-relative), `vault.bytes_written`, `vault.latency_ms`, `vault.op_kind` (`append` or `write_replace`). Satisfies §I5 for the persistence layer. Verified 2026-05-24 against `assistant/logging_setup.py`: the only existing instrumentation is `logfire.instrument_pydantic_ai()` (emits OpenTelemetry GenAI `gen_ai.*` spans around `Agent.run` automatically); the `vault.*` namespace does not collide. Operators see both span families side-by-side: `gen_ai.*` for what the model did, `vault.*` for what was written.
 - **Staging files (`.tmp`) are swept at startup.** Any `.tmp` file in `vault/.staging/` older than process start time is removed. Crashes during `write_replace` leave .tmp orphans; sweep cleans up.
 - **No multi-process coordination.** Single-process assumption. A second process writing the same vault races the in-process lock — undefined behavior, out of scope until a phase explicitly addresses it.
 
